@@ -43,7 +43,6 @@
       ]
     },
     "win": {
-      "icon": "icon.ico",
       "target": [
         {
           "target": "nsis",
@@ -53,9 +52,7 @@
     },
     "nsis": {
       "oneClick": false,
-      "allowToChangeInstallationDirectory": true,
-      "installerIcon": "icon.ico",
-      "uninstallerIcon": "icon.ico"
+      "allowToChangeInstallationDirectory": true
     }
   },
   "devDependencies": {
