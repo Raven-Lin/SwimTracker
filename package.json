@@ -1,0 +1,65 @@
+{
+  "name": "swimtracker",
+  "version": "1.0.0",
+  "description": "Swimming results dashboard for coaches",
+  "main": "main.js",
+  "author": "Joanne Lou",
+  "license": "UNLICENSED",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "build:mac": "electron-builder --mac",
+    "build:win": "electron-builder --win",
+    "build:all": "electron-builder --mac --win"
+  },
+  "build": {
+    "appId": "com.swimtracker.app",
+    "productName": "SwimTracker",
+    "copyright": "Copyright 2026 Joanne Lou",
+    "files": [
+      "main.js",
+      "server.py",
+      "swim_coach_dashboard.html",
+      "swimmer_results.csv"
+    ],
+    "extraResources": [
+      {
+        "from": "server.py",
+        "to": "server.py"
+      },
+      {
+        "from": "swim_coach_dashboard.html",
+        "to": "swim_coach_dashboard.html"
+      }
+    ],
+    "mac": {
+      "category": "public.app-category.sports",
+      "icon": "icon.icns",
+      "target": [
+        {
+          "target": "dmg",
+          "arch": ["arm64", "x64"]
+        }
+      ]
+    },
+    "win": {
+      "icon": "icon.ico",
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "installerIcon": "icon.ico",
+      "uninstallerIcon": "icon.ico"
+    }
+  },
+  "devDependencies": {
+    "electron": "^25.9.0",
+    "electron-builder": "^24.0.0"
+  }
+}

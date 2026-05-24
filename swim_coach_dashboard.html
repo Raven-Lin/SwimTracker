@@ -1,0 +1,1355 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SwimTracker</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Sans:wght@300;400;500;600&display=swap');
+
+  :root {
+    --navy:       #1B3A6B;
+    --aqua:       #0099CC;
+    --aqua-light: #E0F4FB;
+    --gold:       #F2A900;
+    --gold-light: #FFF8E1;
+    --white:      #FFFFFF;
+    --off-white:  #F7F9FC;
+    --grey-100:   #EEF1F6;
+    --grey-300:   #C5CDD9;
+    --grey-500:   #7A8799;
+    --grey-800:   #2D3748;
+    --green:      #1A7A4A;
+    --red:        #C0392B;
+    --radius:     12px;
+    --shadow:     0 4px 24px rgba(27,58,107,0.10);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--off-white);
+    color: var(--grey-800);
+    min-height: 100vh;
+  }
+
+  /* NAV */
+  nav {
+    background: var(--navy);
+    padding: 0 32px;
+    height: 60px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky; top: 0; z-index: 100;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.2);
+  }
+  .nav-logo {
+    font-family: 'DM Serif Display', serif;
+    font-size: 1.25rem;
+    color: var(--white);
+    letter-spacing: 0.02em;
+  }
+  .nav-logo span { color: var(--gold); }
+  .nav-tabs { display: flex; gap: 4px; }
+  .nav-tab {
+    padding: 8px 18px;
+    border-radius: 8px;
+    border: none;
+    background: transparent;
+    color: rgba(255,255,255,0.65);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.875rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .nav-tab:hover { background: rgba(255,255,255,0.1); color: white; }
+  .nav-tab.active { background: var(--aqua); color: white; }
+  .nav-tab:disabled { opacity: 0.35; cursor: not-allowed; }
+
+  /* LAYOUT */
+  .container { max-width: 1280px; margin: 0 auto; padding: 32px 24px; }
+
+  /* BUTTONS */
+  .btn {
+    display: inline-block;
+    padding: 10px 24px;
+    border-radius: 8px;
+    border: none;
+    cursor: pointer;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.9rem;
+    font-weight: 600;
+    transition: all 0.2s;
+  }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .btn-primary  { background: var(--aqua);  color: white; }
+  .btn-primary:hover:not(:disabled)  { background: #007daa; }
+  .btn-gold     { background: var(--gold);  color: var(--navy); }
+  .btn-gold:hover:not(:disabled)     { background: #d4920a; }
+  .btn-outline  { background: transparent; border: 2px solid var(--navy); color: var(--navy); }
+  .btn-outline:hover:not(:disabled)  { background: var(--navy); color: white; }
+  .btn-danger   { background: var(--red);   color: white; }
+  .btn-danger:hover:not(:disabled)   { background: #a93226; }
+  .btn-sm { padding: 6px 14px; font-size: 0.8rem; }
+
+  /* CARDS */
+  .card {
+    background: var(--white);
+    border-radius: var(--radius);
+    padding: 28px;
+    box-shadow: var(--shadow);
+  }
+  .card h2 {
+    font-family: 'DM Serif Display', serif;
+    font-size: 1.3rem;
+    color: var(--navy);
+    margin-bottom: 6px;
+  }
+  .card p.sub { font-size: 0.875rem; color: var(--grey-500); margin-bottom: 20px; }
+
+  /* PAGES */
+  .page { display: none; }
+  .page.active { display: block; }
+
+  /* ══════════════════════════════════════
+     SCRAPE PAGE
+  ══════════════════════════════════════ */
+  .scrape-layout {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+    margin-bottom: 24px;
+  }
+
+  .name-list-wrapper {
+    border: 1.5px solid var(--grey-300);
+    border-radius: 8px;
+    overflow: hidden;
+    margin-bottom: 12px;
+  }
+  .name-list-header {
+    background: var(--grey-100);
+    padding: 8px 14px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--grey-500);
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+  }
+  .name-list { list-style: none; max-height: 260px; overflow-y: auto; }
+  .name-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--grey-100);
+    font-size: 0.9rem;
+  }
+  .name-item:last-child { border-bottom: none; }
+  .name-item .remove-btn {
+    background: none;
+    border: none;
+    color: var(--grey-300);
+    cursor: pointer;
+    font-size: 1rem;
+    line-height: 1;
+    padding: 2px 6px;
+    border-radius: 4px;
+    transition: all 0.15s;
+  }
+  .name-item .remove-btn:hover { background: #fdecea; color: var(--red); }
+  .name-input-row { display: flex; gap: 8px; }
+  .name-input-row input {
+    flex: 1;
+    padding: 10px 14px;
+    border: 1.5px solid var(--grey-300);
+    border-radius: 8px;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.9rem;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  .name-input-row input:focus { border-color: var(--aqua); }
+
+  .option-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 16px;
+    font-size: 0.9rem;
+    color: var(--grey-800);
+  }
+  .toggle-switch {
+    width: 40px; height: 22px;
+    background: var(--grey-300);
+    border-radius: 11px;
+    position: relative;
+    cursor: pointer;
+    transition: background 0.2s;
+    flex-shrink: 0;
+  }
+  .toggle-switch.on { background: var(--aqua); }
+  .toggle-switch::after {
+    content: '';
+    position: absolute;
+    width: 16px; height: 16px;
+    background: white;
+    border-radius: 50%;
+    top: 3px; left: 3px;
+    transition: transform 0.2s;
+  }
+  .toggle-switch.on::after { transform: translateX(18px); }
+
+  .est-time-box {
+    background: var(--aqua-light);
+    border: 1.5px solid var(--aqua);
+    border-radius: 8px;
+    padding: 14px 18px;
+    font-size: 0.875rem;
+    color: var(--navy);
+    margin-bottom: 16px;
+  }
+  .est-time-box strong { font-size: 1rem; }
+
+  /* WAIT SCREEN */
+  .wait-screen {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(27, 58, 107, 0.92);
+    z-index: 999;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+  }
+  .wait-screen.visible { display: flex; }
+
+  .wait-card {
+    background: white;
+    border-radius: 20px;
+    padding: 48px 56px;
+    max-width: 560px;
+    width: 90%;
+    text-align: center;
+    box-shadow: 0 24px 80px rgba(0,0,0,0.3);
+  }
+  .wait-card h2 {
+    font-family: 'DM Serif Display', serif;
+    font-size: 1.6rem;
+    color: var(--navy);
+    margin-bottom: 6px;
+  }
+  .wait-card .wait-sub {
+    font-size: 0.9rem;
+    color: var(--grey-500);
+    margin-bottom: 32px;
+  }
+
+  /* Wave animation */
+  .wave-container {
+    display: flex;
+    justify-content: center;
+    align-items: flex-end;
+    gap: 5px;
+    height: 48px;
+    margin-bottom: 28px;
+  }
+  .wave-bar {
+    width: 6px;
+    border-radius: 3px;
+    background: var(--aqua);
+    animation: wave 1.2s ease-in-out infinite;
+  }
+  .wave-bar:nth-child(1) { animation-delay: 0s;    height: 20px; }
+  .wave-bar:nth-child(2) { animation-delay: 0.1s;  height: 32px; }
+  .wave-bar:nth-child(3) { animation-delay: 0.2s;  height: 44px; }
+  .wave-bar:nth-child(4) { animation-delay: 0.3s;  height: 36px; }
+  .wave-bar:nth-child(5) { animation-delay: 0.4s;  height: 24px; }
+  .wave-bar:nth-child(6) { animation-delay: 0.5s;  height: 40px; }
+  .wave-bar:nth-child(7) { animation-delay: 0.6s;  height: 28px; }
+  .wave-bar:nth-child(8) { animation-delay: 0.7s;  height: 36px; }
+  .wave-bar:nth-child(9) { animation-delay: 0.8s;  height: 20px; }
+  @keyframes wave {
+    0%, 100% { transform: scaleY(0.4); opacity: 0.5; }
+    50%       { transform: scaleY(1);   opacity: 1; }
+  }
+
+  /* Progress bar */
+  .progress-track {
+    background: var(--grey-100);
+    border-radius: 100px;
+    height: 8px;
+    overflow: hidden;
+    margin-bottom: 10px;
+  }
+  .progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--aqua), var(--gold));
+    border-radius: 100px;
+    transition: width 0.4s ease;
+    width: 0%;
+  }
+
+  .wait-swimmer-name {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--navy);
+    margin-bottom: 4px;
+    min-height: 1.4em;
+  }
+  .wait-status {
+    font-size: 0.82rem;
+    color: var(--grey-500);
+    margin-bottom: 20px;
+    min-height: 1.2em;
+  }
+  .wait-timer {
+    font-size: 0.82rem;
+    color: var(--grey-500);
+    margin-bottom: 24px;
+  }
+  .wait-timer strong { color: var(--navy); font-size: 0.95rem; }
+
+  /* Log */
+  .wait-log {
+    background: var(--off-white);
+    border: 1px solid var(--grey-100);
+    border-radius: 8px;
+    padding: 12px 14px;
+    max-height: 120px;
+    overflow-y: auto;
+    text-align: left;
+    font-size: 0.78rem;
+    color: var(--grey-500);
+    font-family: monospace;
+    line-height: 1.7;
+  }
+
+  /* STATS STRIP */
+  .stats-strip {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 16px;
+    margin-bottom: 28px;
+  }
+  .stat-card {
+    background: var(--white);
+    border-radius: var(--radius);
+    padding: 20px;
+    box-shadow: var(--shadow);
+    border-left: 4px solid var(--aqua);
+  }
+  .stat-card .val { font-size: 2rem; font-weight: 600; color: var(--navy); }
+  .stat-card .lbl { font-size: 0.8rem; color: var(--grey-500); margin-top: 2px; text-transform: uppercase; letter-spacing: 0.08em; }
+
+  /* CONTROLS */
+  .controls {
+    background: var(--white);
+    border-radius: var(--radius);
+    padding: 20px 24px;
+    margin-bottom: 24px;
+    box-shadow: var(--shadow);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    align-items: flex-end;
+  }
+  .control-group { display: flex; flex-direction: column; gap: 6px; }
+  .control-group label { font-size: 0.78rem; font-weight: 600; color: var(--grey-500); text-transform: uppercase; letter-spacing: 0.07em; }
+  .control-group select, .control-group input {
+    padding: 9px 14px;
+    border: 1.5px solid var(--grey-300);
+    border-radius: 8px;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.9rem;
+    color: var(--grey-800);
+    background: var(--off-white);
+    cursor: pointer;
+    outline: none;
+    transition: border-color 0.2s;
+    min-width: 160px;
+  }
+  .control-group select:focus, .control-group input:focus { border-color: var(--aqua); }
+
+  /* DASHBOARD GRID */
+  .dashboard-grid {
+    display: grid;
+    grid-template-columns: 260px 1fr;
+    gap: 24px;
+    align-items: start;
+  }
+  .sidebar { background: var(--white); border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden; }
+  .sidebar-header { background: var(--navy); padding: 16px 20px; color: white; font-weight: 600; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.08em; }
+  .swimmer-item {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 12px 16px; border-bottom: 1px solid var(--grey-100);
+    cursor: pointer; transition: background 0.15s; gap: 10px;
+  }
+  .swimmer-item:hover { background: var(--aqua-light); }
+  .swimmer-item.active { background: var(--aqua-light); border-left: 3px solid var(--aqua); }
+  .swimmer-name  { font-size: 0.88rem; font-weight: 500; }
+  .swimmer-club  { font-size: 0.75rem; color: var(--grey-500); }
+  .swimmer-toggle { width: 36px; height: 20px; background: var(--grey-300); border-radius: 10px; position: relative; cursor: pointer; transition: background 0.2s; flex-shrink: 0; }
+  .swimmer-toggle.on { background: var(--aqua); }
+  .swimmer-toggle::after { content: ''; position: absolute; width: 14px; height: 14px; background: white; border-radius: 50%; top: 3px; left: 3px; transition: transform 0.2s; }
+  .swimmer-toggle.on::after { transform: translateX(16px); }
+  .pb-badge { background: var(--gold-light); color: var(--gold); border-radius: 4px; font-size: 0.7rem; font-weight: 700; padding: 2px 6px; white-space: nowrap; }
+
+  /* CHART AREA */
+  .chart-area { display: flex; flex-direction: column; gap: 24px; }
+  .chart-card { background: var(--white); border-radius: var(--radius); padding: 24px; box-shadow: var(--shadow); }
+  .chart-card h3 { font-family: 'DM Serif Display', serif; font-size: 1.1rem; color: var(--navy); margin-bottom: 4px; }
+  .chart-card .chart-sub { font-size: 0.82rem; color: var(--grey-500); margin-bottom: 16px; }
+  .chart-wrap { position: relative; height: 280px; }
+
+  /* TABLE */
+  .table-card { background: var(--white); border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden; }
+  .table-header { background: var(--navy); padding: 16px 24px; color: white; font-weight: 600; display: flex; justify-content: space-between; align-items: center; }
+  table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
+  thead { background: var(--grey-100); }
+  thead th { padding: 10px 14px; text-align: left; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.07em; color: var(--grey-500); font-weight: 600; }
+  tbody tr { border-bottom: 1px solid var(--grey-100); transition: background 0.15s; }
+  tbody tr:hover { background: var(--aqua-light); }
+  tbody td { padding: 10px 14px; }
+  .pb-row { background: var(--gold-light) !important; font-weight: 600; }
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: 0.72rem; font-weight: 700; }
+  .badge-pb { background: var(--gold); color: var(--navy); }
+  .badge-lc { background: #E3F2FD; color: #1565C0; }
+  .badge-sc { background: #E8F5E9; color: #2E7D32; }
+
+  /* EMPTY STATE */
+  .empty { text-align: center; padding: 80px 20px; color: var(--grey-500); }
+  .empty-icon { font-size: 3rem; margin-bottom: 16px; opacity: 0.4; }
+  .empty h3 { font-family: 'DM Serif Display', serif; color: var(--navy); margin-bottom: 8px; }
+
+  @media (max-width: 900px) {
+    .dashboard-grid { grid-template-columns: 1fr; }
+    .scrape-layout  { grid-template-columns: 1fr; }
+    nav { padding: 0 16px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- WAIT SCREEN -->
+<div class="wait-screen" id="wait-screen">
+  <div class="wait-card">
+    <h2>Fetching Results</h2>
+    <div class="wait-sub">Please keep this window open. Do not close your browser.</div>
+
+    <div class="wave-container">
+      <div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div>
+      <div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div>
+      <div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div>
+    </div>
+
+    <div class="wait-swimmer-name" id="wait-swimmer-name">Starting...</div>
+    <div class="wait-status" id="wait-status">Connecting to Swimming Australia...</div>
+
+    <div class="progress-track">
+      <div class="progress-fill" id="progress-fill"></div>
+    </div>
+    <div style="font-size:0.78rem;color:var(--grey-500);margin-bottom:16px;" id="progress-label">0 of 0 swimmers</div>
+
+    <div class="wait-timer">
+      Estimated time remaining: <strong id="wait-eta">Calculating...</strong>
+    </div>
+
+    <div class="wait-log" id="wait-log"></div>
+    <button class="btn btn-danger" style="margin-top:20px;width:100%;" onclick="terminateScrape()">Stop Scraping</button>
+  </div>
+</div>
+
+<!-- NAV -->
+<nav>
+  <div class="nav-logo">Swim<span>Tracker</span></div>
+  <div class="nav-tabs">
+    <button class="nav-tab active" onclick="showPage('scrape', this)">Scrape Data</button>
+    <button class="nav-tab" onclick="showPage('progress', this)" id="tab-progress" disabled>Progress</button>
+    <button class="nav-tab" onclick="showPage('comparison', this)" id="tab-comparison" disabled>Comparison</button>
+    <button class="nav-tab" onclick="showPage('table', this)" id="tab-table" disabled>Results Table</button>
+  </div>
+</nav>
+
+<!-- ══════════ PAGE: SCRAPE ══════════ -->
+<div class="page active" id="page-scrape">
+  <div class="container">
+
+    <div class="scrape-layout">
+
+      <!-- Left: Add names -->
+      <div class="card">
+        <h2>Add Swimmers</h2>
+        <p class="sub">Type each swimmer's full name exactly as it appears on the Swimming Australia website.</p>
+
+        <div class="name-list-wrapper">
+          <div class="name-list-header">Swimmers to scrape</div>
+          <ul class="name-list" id="name-list">
+            <li class="name-item" style="color:var(--grey-500); font-size:0.85rem; justify-content:center;">
+              No swimmers added yet
+            </li>
+          </ul>
+        </div>
+
+        <div class="name-input-row" style="margin-bottom:12px;">
+          <input type="text" id="name-input" placeholder="e.g. Joanne Lou"
+            onkeydown="if(event.key==='Enter') addName()">
+          <select id="name-gender" style="padding:10px 14px;border:1.5px solid var(--grey-300);border-radius:8px;font-family:'DM Sans',sans-serif;font-size:0.9rem;outline:none;">
+            <option value="Female">Female</option>
+            <option value="Male">Male</option>
+          </select>
+          <button class="btn btn-primary" onclick="addName()">Add</button>
+        </div>
+
+        <button class="btn btn-outline btn-sm" onclick="clearNames()" style="margin-right:8px;">Clear All</button>
+      </div>
+
+      <!-- Right: Options + estimate -->
+      <div class="card">
+        <h2>Options</h2>
+        <p class="sub">Configure the scrape before running.</p>
+
+        <div class="option-row">
+          <div class="toggle-switch" id="archived-toggle" onclick="toggleArchived()"></div>
+          <div>
+            <strong>Include archived records</strong>
+            <div style="font-size:0.8rem;color:var(--grey-500);">Shows results prior to 2022. Takes longer to fetch.</div>
+          </div>
+        </div>
+
+        <div class="est-time-box" id="est-time-box">
+          <div style="font-size:0.78rem;color:var(--grey-500);text-transform:uppercase;letter-spacing:0.07em;margin-bottom:6px;">Estimated wait time</div>
+          <strong id="est-time-val">Add at least one swimmer to estimate</strong>
+          <div style="font-size:0.78rem;color:var(--grey-500);margin-top:4px;" id="est-time-detail"></div>
+        </div>
+
+        <div style="margin-bottom:16px;">
+          <div style="font-size:0.78rem;font-weight:600;color:var(--grey-500);text-transform:uppercase;letter-spacing:0.07em;margin-bottom:8px;">What happens when you click Start:</div>
+          <div style="font-size:0.85rem;color:var(--grey-800);line-height:1.9;">
+            1. A browser opens in the background<br>
+            2. Each swimmer is searched automatically<br>
+            3. All result pages are collected<br>
+            4. Charts and tables load automatically when done
+          </div>
+        </div>
+
+        <button class="btn btn-primary" id="start-btn" onclick="startScrape()" disabled
+          style="width:100%;padding:14px;font-size:1rem;">
+          Start Fetching Results
+        </button>
+      </div>
+
+    </div>
+
+    <!-- Previously loaded data notice -->
+    <div id="existing-data-notice" style="display:none;">
+      <div class="card" style="border-left:4px solid var(--green);">
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;">
+          <div>
+            <div style="font-weight:600;color:var(--green);margin-bottom:4px;">Results already loaded</div>
+            <div style="font-size:0.875rem;color:var(--grey-500);" id="existing-data-detail">
+              You have data from a previous scrape.
+            </div>
+          </div>
+          <div style="display:flex;gap:8px;">
+            <button class="btn btn-outline btn-sm" onclick="showPage('progress', document.getElementById('tab-progress'))">View Charts</button>
+            <button class="btn btn-gold btn-sm" onclick="exportCSV()">Export CSV</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ══════════ PAGE: PROGRESS ══════════ -->
+<div class="page" id="page-progress">
+  <div class="container">
+    <div class="stats-strip" id="stats-strip"></div>
+    <div class="controls">
+      <div class="control-group">
+        <label>Stroke</label>
+        <select id="sel-stroke" onchange="updateCharts()"><option value="all">All Strokes</option></select>
+      </div>
+      <div class="control-group">
+        <label>Distance</label>
+        <select id="sel-distance" onchange="updateCharts()"><option value="all">All Distances</option></select>
+      </div>
+      <div class="control-group">
+        <label>Course</label>
+        <select id="sel-course" onchange="updateCharts()">
+          <option value="all">LC and SC</option>
+          <option value="LC">Long Course (LC)</option>
+          <option value="SC">Short Course (SC)</option>
+        </select>
+      </div>
+      <div class="control-group">
+        <label>Metric</label>
+        <select id="sel-metric" onchange="updateCharts()">
+          <option value="seconds">Best Time (seconds)</option>
+          <option value="improvement">Improvement % from First</option>
+        </select>
+      </div>
+    </div>
+    <div class="dashboard-grid">
+      <div class="sidebar">
+        <div class="sidebar-header">Swimmers (toggle to show/hide)</div>
+        <div id="swimmer-list"></div>
+      </div>
+      <div class="chart-area">
+        <div class="chart-card">
+          <h3>Best Times Over Time</h3>
+          <div class="chart-sub">Best time per year per swimmer for the selected event filters</div>
+          <div class="chart-wrap"><canvas id="chart-progress"></canvas></div>
+        </div>
+        <div class="chart-card">
+          <h3>Improvement from First Race</h3>
+          <div class="chart-sub">How much faster each swimmer has become since their first recorded time (higher = more improvement)</div>
+          <div class="chart-wrap"><canvas id="chart-improvement"></canvas></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════ PAGE: COMPARISON ══════════ -->
+<div class="page" id="page-comparison">
+  <div class="container">
+    <div class="controls">
+      <div class="control-group">
+        <label>Select Event</label>
+        <select id="sel-event" onchange="updateComparison()">
+          <option value="">Pick an event</option>
+        </select>
+      </div>
+    </div>
+    <div class="chart-card" style="margin-bottom:24px;">
+      <h3>Head-to-Head Comparison</h3>
+      <div class="chart-sub">Personal best for selected event. Gold bar = fastest swimmer.</div>
+      <div class="chart-wrap"><canvas id="chart-comparison"></canvas></div>
+    </div>
+    <div class="table-card">
+      <div class="table-header"><span>All Swimmer PBs — Selected Event</span></div>
+      <div style="overflow-x:auto;">
+        <table>
+          <thead><tr><th>Rank</th><th>Swimmer</th><th>Club</th><th>PB Time</th><th>Date Set</th><th>Races in Event</th></tr></thead>
+          <tbody id="comparison-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════ PAGE: TABLE ══════════ -->
+<div class="page" id="page-table">
+  <div class="container">
+    <div class="controls">
+      <div class="control-group">
+        <label>Swimmer</label>
+        <select id="tbl-swimmer" onchange="updateTable()"><option value="all">All Swimmers</option></select>
+      </div>
+      <div class="control-group">
+        <label>Stroke</label>
+        <select id="tbl-stroke" onchange="updateTable()"><option value="all">All</option></select>
+      </div>
+      <div class="control-group">
+        <label>Distance</label>
+        <select id="tbl-distance" onchange="updateTable()"><option value="all">All</option></select>
+      </div>
+      <div class="control-group">
+        <label>Show</label>
+        <select id="tbl-show" onchange="updateTable()">
+          <option value="all">All Races</option>
+          <option value="pb">PBs Only</option>
+        </select>
+      </div>
+      <div class="control-group">
+        <label>Gender</label>
+        <select id="tbl-gender" onchange="updateTable()">
+          <option value="all">All</option>
+          <option value="Female">Female</option>
+          <option value="Male">Male</option>
+        </select>
+      </div>
+      <div class="control-group">
+        <label>Gender</label>
+        <select id="tbl-gender" onchange="updateTable()">
+          <option value="all">All</option>
+          <option value="Female">Female</option>
+          <option value="Male">Male</option>
+        </select>
+      </div>
+      <div class="control-group">
+        <label>Search meet</label>
+        <input type="text" id="tbl-search" placeholder="Meet name..." oninput="updateTable()">
+      </div>
+      <div style="margin-left:auto;">
+        <button class="btn btn-gold" onclick="exportCSV()">Export CSV</button>
+      </div>
+    </div>
+    <div class="table-card">
+      <div class="table-header"><span id="table-count">Results</span></div>
+      <div style="overflow-x:auto;max-height:600px;overflow-y:auto;">
+        <table>
+          <thead>
+            <tr>
+              <th onclick="sortTable('name')" style="cursor:pointer;">Swimmer</th>
+              <th onclick="sortTable('race_date')" style="cursor:pointer;">Date</th>
+              <th>Course</th>
+              <th onclick="sortTable('distance')" style="cursor:pointer;">Distance</th>
+              <th>Stroke</th>
+              <th onclick="sortTable('time')" style="cursor:pointer;">Time</th>
+              <th>Age Grp</th>
+              <th>Meet</th>
+              <th>PB</th>
+            </tr>
+          </thead>
+          <tbody id="results-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<script>
+// ══════════════════════════════════════════
+// STATE
+// ══════════════════════════════════════════
+let allData        = [];
+let activeSwimmers = new Set();
+let charts         = {};
+let sortCol        = 'race_date';
+let sortAsc        = false;
+let nameList        = [];
+let includeArchived = false;
+let genderMap       = {};  // { "Joanne Lou": "Female", "Aaron Lou": "Male" }
+
+// Seconds per swimmer estimate (archived adds more)
+const SEC_PER_SWIMMER_NORMAL   = 90;
+const SEC_PER_SWIMMER_ARCHIVED = 180;
+
+const COLORS = [
+  '#0099CC','#F2A900','#1A7A4A','#C0392B','#7B2D8B',
+  '#E67E22','#16A085','#2C3E50','#8E44AD','#D35400'
+];
+
+// ══════════════════════════════════════════
+// NAV
+// ══════════════════════════════════════════
+function showPage(id, btn) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('page-' + id).classList.add('active');
+  if (btn) btn.classList.add('active');
+}
+
+// ══════════════════════════════════════════
+// NAME LIST
+// ══════════════════════════════════════════
+function addName() {
+  const input = document.getElementById('name-input');
+  const val   = input.value.trim();
+  if (!val) return;
+  if (nameList.includes(val)) { input.value = ''; return; }
+  const gender = document.getElementById('name-gender').value;
+  genderMap[val] = gender;
+  nameList.push(val);
+  input.value = '';
+  renderNameList();
+  updateEstimate();
+}
+
+function removeName(i) {
+  nameList.splice(i, 1);
+  renderNameList();
+  updateEstimate();
+}
+
+function clearNames() {
+  nameList = [];
+  renderNameList();
+  updateEstimate();
+}
+
+function renderNameList() {
+  const ul = document.getElementById('name-list');
+  if (!nameList.length) {
+    ul.innerHTML = '<li class="name-item" style="color:var(--grey-500);font-size:0.85rem;justify-content:center;">No swimmers added yet</li>';
+    document.getElementById('start-btn').disabled = true;
+    return;
+  }
+  ul.innerHTML = nameList.map((n, i) => `
+    <li class="name-item">
+      <span>${n}</span>
+      <button class="remove-btn" onclick="removeName(${i})">x</button>
+    </li>`).join('');
+  document.getElementById('start-btn').disabled = false;
+}
+
+function toggleArchived() {
+  includeArchived = !includeArchived;
+  const t = document.getElementById('archived-toggle');
+  t.classList.toggle('on', includeArchived);
+  updateEstimate();
+}
+
+function updateEstimate() {
+  const n   = nameList.length;
+  const sps = includeArchived ? SEC_PER_SWIMMER_ARCHIVED : SEC_PER_SWIMMER_NORMAL;
+  const box = document.getElementById('est-time-val');
+  const det = document.getElementById('est-time-detail');
+
+  if (!n) {
+    box.textContent = 'Add at least one swimmer to estimate';
+    det.textContent = '';
+    return;
+  }
+
+  const total = n * sps;
+  const mins  = Math.floor(total / 60);
+  const secs  = total % 60;
+  box.textContent = mins > 0
+    ? `Approximately ${mins} min ${secs > 0 ? secs + ' sec' : ''}`
+    : `Approximately ${secs} seconds`;
+
+  det.textContent = includeArchived
+    ? `${n} swimmer${n>1?'s':''} with archived records — each takes longer to load`
+    : `${n} swimmer${n>1?'s':''} — recent records only`;
+}
+
+// ══════════════════════════════════════════
+// SCRAPE
+// ══════════════════════════════════════════
+let scrapeStartTime = null;
+let etaInterval     = null;
+
+function terminateScrape() {
+  if (confirm('Stop the current scrape? Results collected so far will be saved.')) {
+    if (window._evtSource) {
+      window._evtSource.close();
+    }
+    clearInterval(etaInterval);
+    document.getElementById('wait-screen').classList.remove('visible');
+  }
+}
+
+function startScrape() {
+  if (!nameList.length) return;
+
+  const waitScreen = document.getElementById('wait-screen');
+  waitScreen.classList.add('visible');
+  document.getElementById('wait-log').textContent = '';
+  document.getElementById('progress-fill').style.width = '0%';
+  document.getElementById('progress-label').textContent = `0 of ${nameList.length} swimmers`;
+  document.getElementById('wait-swimmer-name').textContent = 'Connecting...';
+  document.getElementById('wait-status').textContent = 'Opening Swimming Australia website...';
+  document.getElementById('wait-eta').textContent = 'Calculating...';
+
+  scrapeStartTime = Date.now();
+  let completedCount = 0;
+  const totalCount   = nameList.length;
+  const sps = includeArchived ? SEC_PER_SWIMMER_ARCHIVED : SEC_PER_SWIMMER_NORMAL;
+
+  // ETA timer
+  etaInterval = setInterval(() => {
+    const elapsed   = (Date.now() - scrapeStartTime) / 1000;
+    const totalEst  = totalCount * sps;
+    const remaining = Math.max(0, totalEst - elapsed);
+    const m = Math.floor(remaining / 60);
+    const s = Math.floor(remaining % 60);
+    document.getElementById('wait-eta').textContent =
+      remaining < 5 ? 'Almost done...' :
+      m > 0 ? `${m} min ${s} sec` : `${s} sec`;
+  }, 1000);
+
+  // Server-Sent Events from the server
+  window._evtSource = new EventSource('/scrape-stream?' + new URLSearchParams({
+    names: JSON.stringify(nameList),
+    archived: includeArchived
+  }));
+
+  window._evtSource.onmessage = (e) => {
+    const msg = JSON.parse(e.data);
+
+    if (msg.type === 'progress') {
+      const text = msg.message;
+
+      // Update log
+      const log = document.getElementById('wait-log');
+      log.textContent += text + '\n';
+      log.scrollTop = log.scrollHeight;
+
+      // Update swimmer name if we detect "Found:"
+      if (text.includes('Found')) {
+        const match = text.match(/Found (.+?) \(/);
+        if (match) document.getElementById('wait-swimmer-name').textContent = match[1];
+      } else if (text.includes('Searching for')) {
+        const match = text.match(/Searching for (.+?)\.\.\./);
+        if (match) {
+          document.getElementById('wait-swimmer-name').textContent = match[1];
+          document.getElementById('wait-status').textContent = 'Searching...';
+        }
+      } else if (text.includes('Reading page')) {
+        document.getElementById('wait-status').textContent = text;
+      } else if (text.includes('Done')) {
+        completedCount++;
+        const pct = Math.round((completedCount / totalCount) * 100);
+        document.getElementById('progress-fill').style.width = pct + '%';
+        document.getElementById('progress-label').textContent =
+          `${completedCount} of ${totalCount} swimmers complete`;
+      }
+
+    } else if (msg.type === 'complete') {
+      clearInterval(etaInterval);
+      window._evtSource.close();
+
+      // Parse CSV and load dashboard
+      const csv = msg.csv;
+      loadFromCSVString(csv);
+
+      document.getElementById('wait-swimmer-name').textContent = 'All done!';
+      document.getElementById('wait-status').textContent = `${msg.total} results loaded successfully.`;
+      document.getElementById('wait-eta').textContent = 'Complete';
+      document.getElementById('progress-fill').style.width = '100%';
+
+      setTimeout(() => {
+        waitScreen.classList.remove('visible');
+        showPage('progress', document.getElementById('tab-progress'));
+      }, 1800);
+
+    } else if (msg.type === 'error') {
+      clearInterval(etaInterval);
+      window._evtSource.close();
+      waitScreen.classList.remove('visible');
+      alert('Error: ' + msg.message);
+    }
+  };
+
+  evtSource.onerror = () => {
+    clearInterval(etaInterval);
+    evtSource.close();
+    waitScreen.classList.remove('visible');
+    alert('Connection to server lost. Make sure server.py is still running.');
+  };
+}
+
+// ══════════════════════════════════════════
+// DATA LOADING
+// ══════════════════════════════════════════
+function timeToSeconds(t) {
+  if (!t) return null;
+  const parts = t.split(':');
+  if (parts.length === 2) return parseInt(parts[0]) * 60 + parseFloat(parts[1]);
+  return parseFloat(t);
+}
+function secondsToTime(s) {
+  if (s === null || s === undefined) return '—';
+  const m = Math.floor(s / 60), sec = s - m * 60;
+  return `${m}:${sec.toFixed(2).padStart(5,'0')}`;
+}
+
+function parseCSVLine(line) {
+  const result = []; let cur = ''; let inQ = false;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (ch === '"') { inQ = !inQ; }
+    else if (ch === ',' && !inQ) { result.push(cur); cur = ''; }
+    else cur += ch;
+  }
+  result.push(cur); return result;
+}
+
+function loadFromCSVString(text) {
+  const lines   = text.trim().split('\n');
+  const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, ''));
+  allData = lines.slice(1).map(line => {
+    const vals = parseCSVLine(line);
+    const obj  = {};
+    headers.forEach((h, i) => obj[h] = (vals[i] || '').trim().replace(/^"|"$/g, ''));
+    obj.seconds  = timeToSeconds(obj.time);
+    obj.year     = obj.race_date ? parseInt(obj.race_date.split('-')[0]) : null;
+    obj.date_obj = obj.race_date ? new Date(obj.race_date) : null;
+    return obj;
+  }).filter(r => r.name && r.seconds);
+
+  // Mark PBs
+  const pbMap = {};
+  allData.forEach(r => {
+    const key = `${r.name}|${r.course}|${r.distance}|${r.stroke}`;
+    if (!pbMap[key] || r.seconds < pbMap[key]) pbMap[key] = r.seconds;
+  });
+  allData.forEach(r => {
+    const key = `${r.name}|${r.course}|${r.distance}|${r.stroke}`;
+    r.is_pb = r.seconds === pbMap[key];
+  });
+
+  initDashboard();
+}
+
+// Try to load existing results from server on page load
+window.addEventListener('load', () => {
+  setTimeout(() => {
+    fetch('/results')
+      .then(r => r.json())
+      .then(rows => {
+        if (!rows || !rows.length) return;
+        const keys = Object.keys(rows[0]);
+        const csv  = [keys.join(','), ...rows.map(r => keys.map(k => `"${r[k]||''}"`).join(','))].join('\n');
+        loadFromCSVString(csv);
+        const notice = document.getElementById('existing-data-notice');
+        if (notice) notice.style.display = 'block';
+        const detail = document.getElementById('existing-data-detail');
+        if (detail) detail.textContent =
+          `${rows.length} results for ${[...new Set(rows.map(r=>r.name))].length} swimmers loaded from previous scrape.`;
+      })
+      .catch(() => {});
+  }, 500);
+});
+
+// ══════════════════════════════════════════
+// INIT DASHBOARD
+// ══════════════════════════════════════════
+function getSwimmers() { return [...new Set(allData.map(r => r.name))].sort(); }
+
+function initDashboard() {
+  const swimmers  = getSwimmers();
+  activeSwimmers  = new Set(swimmers);
+  const strokes   = [...new Set(allData.map(r => r.stroke))].sort();
+  const distances = [...new Set(allData.map(r => r.distance))].sort((a,b)=>parseInt(a)-parseInt(b));
+  const events    = [...new Set(allData.map(r => `${r.course}|${r.distance}|${r.stroke}`))].sort();
+
+  ['sel-stroke','tbl-stroke'].forEach(id => {
+    const el = document.getElementById(id);
+    el.innerHTML = '<option value="all">All Strokes</option>';
+    strokes.forEach(s => el.innerHTML += `<option value="${s}">${s}</option>`);
+  });
+  ['sel-distance','tbl-distance'].forEach(id => {
+    const el = document.getElementById(id);
+    el.innerHTML = '<option value="all">All Distances</option>';
+    distances.forEach(d => el.innerHTML += `<option value="${d}">${d}</option>`);
+  });
+  ['tbl-swimmer'].forEach(id => {
+    const el = document.getElementById(id);
+    el.innerHTML = '<option value="all">All Swimmers</option>';
+    swimmers.forEach(s => el.innerHTML += `<option value="${s}">${s}</option>`);
+  });
+
+  const evSel = document.getElementById('sel-event');
+  evSel.innerHTML = '<option value="">Pick an event</option>';
+  events.forEach(ev => {
+    const [course, dist, stroke] = ev.split('|');
+    evSel.innerHTML += `<option value="${ev}">${course} ${dist} ${stroke}</option>`;
+  });
+
+  // Enable nav tabs
+  ['tab-progress','tab-comparison','tab-table'].forEach(id => {
+    document.getElementById(id).disabled = false;
+  });
+
+  buildStats();
+  buildSidebar();
+  updateCharts();
+  updateTable();
+}
+
+// ══════════════════════════════════════════
+// STATS
+// ══════════════════════════════════════════
+function buildStats() {
+  const swimmers = getSwimmers();
+  const pbs      = allData.filter(r => r.is_pb).length;
+  const meets    = [...new Set(allData.map(r => r.race_name))].length;
+  const years    = [...new Set(allData.map(r => r.year))].filter(Boolean);
+  const span     = years.length ? `${Math.min(...years)}\u2013${Math.max(...years)}` : '—';
+  document.getElementById('stats-strip').innerHTML = `
+    <div class="stat-card"><div class="val">${swimmers.length}</div><div class="lbl">Swimmers</div></div>
+    <div class="stat-card"><div class="val">${allData.length}</div><div class="lbl">Total Races</div></div>
+    <div class="stat-card"><div class="val">${pbs}</div><div class="lbl">PBs Recorded</div></div>
+    <div class="stat-card"><div class="val">${meets}</div><div class="lbl">Meets</div></div>
+    <div class="stat-card"><div class="val">${span}</div><div class="lbl">Years Active</div></div>`;
+}
+
+// ══════════════════════════════════════════
+// SIDEBAR
+// ══════════════════════════════════════════
+function buildSidebar() {
+  const swimmers = getSwimmers();
+  const list     = document.getElementById('swimmer-list');
+  list.innerHTML = '';
+  swimmers.forEach((name, i) => {
+    const club = (allData.find(r => r.name === name) || {}).club || '';
+    const pbs  = allData.filter(r => r.name === name && r.is_pb).length;
+    const isOn = activeSwimmers.has(name);
+    list.innerHTML += `
+      <div class="swimmer-item ${isOn?'active':''}" id="sw-item-${i}" onclick="toggleSwimmer('${name.replace(/'/g,"\\'")}',${i})">
+        <div style="display:flex;align-items:center;gap:8px;flex:1;min-width:0;">
+          <div style="width:10px;height:10px;border-radius:50%;background:${COLORS[i%COLORS.length]};flex-shrink:0;"></div>
+          <div style="min-width:0;">
+            <div class="swimmer-name" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${name}</div>
+            <div class="swimmer-club">${club}</div>
+          </div>
+        </div>
+        <span class="pb-badge">${pbs} PBs</span>
+        <div class="swimmer-toggle ${isOn?'on':''}" id="toggle-${i}"></div>
+      </div>`;
+  });
+}
+
+function toggleSwimmer(name, i) {
+  if (activeSwimmers.has(name)) activeSwimmers.delete(name);
+  else activeSwimmers.add(name);
+  document.getElementById('toggle-'+i).classList.toggle('on', activeSwimmers.has(name));
+  document.getElementById('sw-item-'+i).classList.toggle('active', activeSwimmers.has(name));
+  updateCharts();
+}
+
+// ══════════════════════════════════════════
+// CHARTS
+// ══════════════════════════════════════════
+function destroyChart(id) { if (charts[id]) { charts[id].destroy(); delete charts[id]; } }
+
+function getFiltered() {
+  const stroke   = document.getElementById('sel-stroke').value;
+  const distance = document.getElementById('sel-distance').value;
+  const course   = document.getElementById('sel-course').value;
+  return allData.filter(r =>
+    activeSwimmers.has(r.name) &&
+    (stroke   === 'all' || r.stroke   === stroke) &&
+    (distance === 'all' || r.distance === distance) &&
+    (course   === 'all' || r.course   === course)
+  );
+}
+
+function updateCharts() {
+  const metric   = document.getElementById('sel-metric').value;
+  const filtered = getFiltered();
+  const swimmers = getSwimmers().filter(n => activeSwimmers.has(n));
+  const allYears = [...new Set(filtered.map(r => r.year))].filter(Boolean).sort();
+
+  destroyChart('progress');
+  const datasets1 = swimmers.map((name, i) => {
+    const swData = filtered.filter(r => r.name === name);
+    const byYear = {};
+    allYears.forEach(yr => {
+      const yrRows = swData.filter(r => r.year === yr);
+      if (!yrRows.length) return;
+      if (metric === 'seconds') {
+        byYear[yr] = Math.min(...yrRows.map(r => r.seconds));
+      } else {
+        const allSw   = allData.filter(r => r.name === name &&
+          (document.getElementById('sel-stroke').value   === 'all' || r.stroke   === document.getElementById('sel-stroke').value) &&
+          (document.getElementById('sel-distance').value === 'all' || r.distance === document.getElementById('sel-distance').value) &&
+          (document.getElementById('sel-course').value   === 'all' || r.course   === document.getElementById('sel-course').value));
+        const minYr    = Math.min(...allSw.map(r=>r.year).filter(Boolean));
+        const first    = Math.min(...allSw.filter(r=>r.year===minYr).map(r=>r.seconds));
+        const best     = Math.min(...yrRows.map(r=>r.seconds));
+        byYear[yr]     = first ? +((first-best)/first*100).toFixed(2) : null;
+      }
+    });
+    return {
+      label: name, data: allYears.map(yr => byYear[yr] ?? null),
+      borderColor: COLORS[i%COLORS.length], backgroundColor: COLORS[i%COLORS.length]+'22',
+      borderWidth: 2.5, pointRadius: 5, tension: 0.3, fill: false, spanGaps: true
+    };
+  });
+
+  const yLabel = metric === 'seconds' ? 'Time (seconds)' : 'Improvement (%)';
+  const ctx1 = document.getElementById('chart-progress').getContext('2d');
+  charts.progress = new Chart(ctx1, {
+    type: 'line',
+    data: { labels: allYears, datasets: datasets1 },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { position: 'top', labels: { font: { family: 'DM Sans', size: 12 }, usePointStyle: true } },
+        tooltip: { callbacks: { label: ctx => metric === 'improvement'
+          ? ` ${ctx.dataset.label}: +${ctx.parsed.y?.toFixed(2)}%`
+          : ` ${ctx.dataset.label}: ${secondsToTime(ctx.parsed.y)}` }}
+      },
+      scales: {
+        y: { reverse: metric === 'seconds',
+             title: { display: true, text: yLabel, font: { family: 'DM Sans', size: 11 } },
+             ticks: { font: { family: 'DM Sans' }, callback: v => metric === 'improvement' ? v+'%' : secondsToTime(v) }},
+        x: { ticks: { font: { family: 'DM Sans' } }}
+      }
+    }
+  });
+
+  destroyChart('improvement');
+  const datasets2 = swimmers.map((name, i) => {
+    const allSw  = allData.filter(r => r.name === name &&
+      (document.getElementById('sel-stroke').value   === 'all' || r.stroke   === document.getElementById('sel-stroke').value) &&
+      (document.getElementById('sel-distance').value === 'all' || r.distance === document.getElementById('sel-distance').value) &&
+      (document.getElementById('sel-course').value   === 'all' || r.course   === document.getElementById('sel-course').value));
+    const byYear = {};
+    allYears.forEach(yr => {
+      const yrRows = allSw.filter(r => r.year === yr);
+      if (!yrRows.length) return;
+      const minYr = Math.min(...allSw.map(r=>r.year).filter(Boolean));
+      const first = Math.min(...allSw.filter(r=>r.year===minYr).map(r=>r.seconds));
+      const best  = Math.min(...yrRows.map(r=>r.seconds));
+      byYear[yr]  = first ? +((first-best)/first*100).toFixed(2) : null;
+    });
+    return {
+      label: name, data: allYears.map(yr => byYear[yr] ?? null),
+      borderColor: COLORS[i%COLORS.length], backgroundColor: COLORS[i%COLORS.length]+'33',
+      borderWidth: 2.5, pointRadius: 5, tension: 0.3, fill: true, spanGaps: true
+    };
+  });
+
+  const ctx2 = document.getElementById('chart-improvement').getContext('2d');
+  charts.improvement = new Chart(ctx2, {
+    type: 'line',
+    data: { labels: allYears, datasets: datasets2 },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { position: 'top', labels: { font: { family: 'DM Sans', size: 12 }, usePointStyle: true } },
+        tooltip: { callbacks: { label: ctx => ` ${ctx.dataset.label}: +${ctx.parsed.y?.toFixed(2)}%` }}
+      },
+      scales: {
+        y: { title: { display: true, text: 'Improvement (%)', font: { family: 'DM Sans', size: 11 } },
+             ticks: { font: { family: 'DM Sans' }, callback: v => v+'%' }},
+        x: { ticks: { font: { family: 'DM Sans' } }}
+      }
+    }
+  });
+}
+
+// ══════════════════════════════════════════
+// COMPARISON
+// ══════════════════════════════════════════
+function updateComparison() {
+  const val = document.getElementById('sel-event').value;
+  if (!val) return;
+  const [course, dist, stroke] = val.split('|');
+  const swimmers = getSwimmers();
+
+  const pbs = swimmers.map(name => {
+    const rows = allData.filter(r => r.name===name && r.course===course && r.distance===dist && r.stroke===stroke);
+    const best = rows.length ? Math.min(...rows.map(r=>r.seconds)) : null;
+    const bestRow = rows.find(r=>r.seconds===best);
+    return { name, seconds: best, time: bestRow?.time, date: bestRow?.race_date, count: rows.length };
+  }).filter(r => r.seconds);
+
+  pbs.sort((a,b) => a.seconds - b.seconds);
+  const fastest = pbs[0]?.seconds;
+
+  destroyChart('comparison');
+  const ctx = document.getElementById('chart-comparison').getContext('2d');
+  charts.comparison = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: pbs.map(r=>r.name),
+      datasets: [{
+        label: `${course} ${dist} ${stroke} — PB`,
+        data: pbs.map(r=>r.seconds),
+        backgroundColor: pbs.map(r => r.seconds===fastest ? '#F2A900' : '#0099CC88'),
+        borderColor:     pbs.map(r => r.seconds===fastest ? '#d4920a' : '#0099CC'),
+        borderWidth: 2, borderRadius: 6
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false, indexAxis: 'y',
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: ctx => ` ${secondsToTime(ctx.parsed.x)}` }}
+      },
+      scales: {
+        x: { ticks: { callback: v => secondsToTime(v), font: { family: 'DM Sans' } },
+             title: { display: true, text: 'Time (seconds)', font: { family: 'DM Sans' } }},
+        y: { ticks: { font: { family: 'DM Sans', size: 12 } }}
+      }
+    }
+  });
+
+  const ranks = ['1st', '2nd', '3rd'];
+  const tbody = document.getElementById('comparison-tbody');
+  tbody.innerHTML = '';
+  pbs.forEach((r, i) => {
+    tbody.innerHTML += `
+      <tr ${i===0?'class="pb-row"':''}>
+        <td><strong>${ranks[i] || (i+1)+'th'}</strong></td>
+        <td><strong>${r.name}</strong></td>
+        <td>${(allData.find(d=>d.name===r.name)||{}).club||''}</td>
+        <td><strong>${r.time}</strong></td>
+        <td>${r.date||'—'}</td>
+        <td>${r.count}</td>
+      </tr>`;
+  });
+}
+
+// ══════════════════════════════════════════
+// TABLE
+// ══════════════════════════════════════════
+function updateTable() {
+  const swimmer  = document.getElementById('tbl-swimmer').value;
+  const stroke   = document.getElementById('tbl-stroke').value;
+  const distance = document.getElementById('tbl-distance').value;
+  const show     = document.getElementById('tbl-show').value;
+  const gender   = document.getElementById('tbl-gender').value;
+  const search   = document.getElementById('tbl-search').value.toLowerCase();
+
+  let rows = allData.filter(r =>
+    (swimmer  === 'all' || r.name     === swimmer) &&
+    (stroke   === 'all' || r.stroke   === stroke) &&
+    (distance === 'all' || r.distance === distance) &&
+    (show     === 'all' || r.is_pb) &&
+    (gender   === 'all' || (genderMap[r.name] || 'all') === gender) &&
+    (!search  || r.race_name.toLowerCase().includes(search))
+  );
+
+  rows.sort((a,b) => {
+    let av = a[sortCol], bv = b[sortCol];
+    if (sortCol==='race_date') { av=a.date_obj; bv=b.date_obj; }
+    if (sortCol==='distance')  { av=parseInt(a.distance); bv=parseInt(b.distance); }
+    if (sortCol==='time')      { av=a.seconds; bv=b.seconds; }
+    if (av<bv) return sortAsc?-1:1;
+    if (av>bv) return sortAsc?1:-1;
+    return 0;
+  });
+
+  document.getElementById('table-count').textContent = `${rows.length} results`;
+  const tbody = document.getElementById('results-tbody');
+  tbody.innerHTML = '';
+  rows.forEach(r => {
+    tbody.innerHTML += `
+      <tr ${r.is_pb?'class="pb-row"':''}>
+        <td><strong>${r.name}</strong></td>
+        <td>${r.race_date||''}</td>
+        <td><span class="badge badge-${r.course.toLowerCase()}">${r.course}</span></td>
+        <td>${r.distance}</td>
+        <td>${r.stroke}</td>
+        <td><strong>${r.time}</strong></td>
+        <td>${r.age_grp}</td>
+        <td style="font-size:0.8rem;color:var(--grey-500);">${r.race_name}</td>
+        <td>${r.is_pb?'<span class="badge badge-pb">PB</span>':''}</td>
+      </tr>`;
+  });
+}
+
+function sortTable(col) {
+  if (sortCol===col) sortAsc=!sortAsc; else { sortCol=col; sortAsc=true; }
+  updateTable();
+}
+
+// ══════════════════════════════════════════
+// EXPORT
+// ══════════════════════════════════════════
+function exportCSV() {
+  const cols = ['name','club','race_date','course','distance','stroke','time','age_grp','race_name'];
+  const csv  = [cols.join(','), ...allData.map(r => cols.map(c=>`"${r[c]||''}"`).join(','))].join('\n');
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href=url; a.download='swimmer_results.csv'; a.click();
+  URL.revokeObjectURL(url);
+}
+</script>
+</body>
+</html>
