@@ -67,23 +67,39 @@ you can export it back to CSV at any point as a backup.
 
 Coaches consistently rely on a small number of views. These are those views.
 
-### World Aquatics points are the backbone
+### Times lead. Points are a tool, not the subject
 
-Across 150 swimmers of different ages, genders and events, **seconds are not
-comparable**. A 12-year-old's 50 Free and a 17-year-old's 400 IM cannot go on
-the same axis and mean anything.
+Coaches work in seconds, and so does this app: best-time boards, PB
+progression, "how far off your best are you", event rankings. If a question
+can be answered in seconds, it is.
 
-World Aquatics points (still widely called FINA points) fix this. Every swim
-is scored against the world record for that gender, course and event:
+Points are kept for the one job seconds genuinely cannot do. Across 150
+swimmers of different ages, genders and events, **seconds are not
+comparable** — a 12-year-old's 50 Free and a 17-year-old's 400 IM cannot go
+on the same axis and mean anything. World Aquatics points (still widely
+called FINA points) fix that by scoring every swim against the world record
+for its gender, course and event:
 
 ```
 points = 1000 × (world record ÷ your time)³
 ```
 
-The base time scores 1000. Now every swim in the squad sits on one 0–1000
-scale, and a 50-point gain in the 400 IM is directly comparable to a 50-point
-gain in the 50 Free. This is what makes squad-wide ranking and "who is
-improving?" answerable at all.
+The base time scores 1000, so every swim lands on one 0–1000 scale and a
+50-point gain in the 400 IM is comparable to a 50-point gain in the 50 Free.
+
+That is used in exactly three places, and nowhere else:
+
+- **Event portfolio** — ranking one swimmer's own events against each other,
+  to see what they are actually best at. A 1:18 breaststroke can be a better
+  swim than a 1:00 freestyle; only points can tell you that.
+- **Squad standard and the improvement leaderboard** — squad-wide questions
+  that have no common time.
+- **Colour on the coverage grid** — so strength is comparable across
+  columns. The cells themselves show times.
+
+An earlier version of this app used points almost everywhere, including for
+"how far off your best are you". That put an abstraction between the coach
+and the thing they work in, and it was wrong.
 
 Base times live in one editable table in [`src/points.js`](src/points.js).
 World records move; update a number there and every chart re-scores itself.
@@ -97,7 +113,7 @@ factor, so rankings inside an event never shift.
 | **Squad** | What standard is my squad at, and who is moving? A points histogram shows the squad's shape; a leaderboard ranks the biggest points gains this season; a sortable table covers every swimmer. |
 | **Swimmer** | How is this one swimmer tracking? PB progression, current form, event portfolio and race consistency. |
 | **Events** | Who is fastest in this event, and how do a few swimmers compare across seasons? |
-| **Coverage** | Who has never raced what? A swimmers × events heatmap where the *empty* cells are the useful information. |
+| **Coverage** | A best-times board: every swimmer's PB in every event, colour-coded by strength. Doubles as the answer to "who has never raced what?" — the *empty* cells are half the value. |
 | **Results** | Every race, filtered and sorted however you like. |
 
 ### Design decisions worth knowing about
@@ -109,9 +125,12 @@ stepped PB line is also the honest shape — a PB holds flat until it is broken.
 A smooth curve through every swim implies improvement between races that never
 happened.
 
-**Season best vs personal best is its own chart.** This is the diagnostic
-coaches use most: a season best closing in on the PB means a swimmer is coming
-into form; a wide gap means they are still climbing back.
+**Season best vs personal best is its own chart, measured in seconds.** This
+is the diagnostic coaches use most: a season best closing in on the PB means a
+swimmer is coming into form; a wide gap means they are still climbing back.
+The unit is seconds off the PB, because that is what a coach says out loud —
+and because "1.2 seconds off" and "3.5 seconds off" compare honestly across
+events whose raw times never could.
 
 **Time axes are reversed so faster is up (or further right).** Coaches read
 "up" as "better", and an un-reversed time axis gets misread at a glance.
