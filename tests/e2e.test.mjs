@@ -588,3 +588,53 @@ test('no console errors after the season and empty-state work', async () => {
   assert.equal(real.length, 0, 'console errors:\n' + real.join('\n'));
   assert.equal(pageErrors.length, 0, 'page errors:\n' + pageErrors.join('\n'));
 });
+
+/* ==========================================================================
+   file:// — the way most people will actually open this
+   ========================================================================== */
+
+test('Load sample data works from a double-clicked file, not just over HTTP', async () => {
+  // Browsers block fetch()/XHR from a file:// page (opaque origin), which is
+  // why the sample ships as a <script> as well as a .csv. This is the exact
+  // path a coach takes when they unzip the download and double-click.
+  const filePage = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+  const fileErrors = [];
+  filePage.on('pageerror', e => fileErrors.push(String(e)));
+
+  try {
+    await filePage.goto('file://' + join(ROOT, 'index.html'), { waitUntil: 'load' });
+    await filePage.click('#load-sample');
+    await filePage.waitForFunction(
+      () => window.__swimtracker?.state?.dataset?.swimmers?.size > 5,
+      { timeout: 20000 }
+    );
+
+    const info = await filePage.evaluate(() => ({
+      swimmers: window.__swimtracker.state.dataset.swimmers.size,
+      races: window.__swimtracker.state.dataset.races.length,
+      warnings: document.querySelectorAll(
+        '#import-report .notice-warn, #import-report .notice-error').length
+    }));
+
+    assert.ok(info.swimmers > 5, `loaded ${info.swimmers} swimmers from file://`);
+    assert.ok(info.races > 100, `loaded ${info.races} races`);
+    assert.equal(info.warnings, 0, 'no "could not load the sample file" warning');
+    assert.equal(fileErrors.length, 0, fileErrors.join('\n'));
+  } finally {
+    await filePage.close();
+  }
+});
+
+test('the generated sample script matches the sample CSV exactly', async () => {
+  // assets/sample-squad.js is generated from the .csv. If someone edits the
+  // CSV and forgets to regenerate, the download and the button disagree.
+  const csv = await readFile(join(ROOT, 'assets/sample-squad.csv'), 'utf8');
+  const js = await readFile(join(ROOT, 'assets/sample-squad.js'), 'utf8');
+
+  const sandbox = {};
+  // eslint-disable-next-line no-new-func
+  new Function('window', js)(sandbox);
+
+  assert.equal(sandbox.__SWIMTRACKER_SAMPLE__, csv,
+    'assets/sample-squad.js is stale — run `node tools/make-sample-js.mjs`');
+});

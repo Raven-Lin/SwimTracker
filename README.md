@@ -28,12 +28,12 @@ anyone — they open it in a browser and start working. No install, no login.
 ### Option 2 — just open the file
 
 Download the repository as a ZIP, unzip it, and double-click `index.html`.
-Everything works, including charts and saved data, with no internet
-connection at all.
+Everything works — charts, the sample data button, and saved results — with
+no internet connection and nothing installed.
 
-The only difference: browsers block a page opened from disk from reading
-other files, so the **Load sample data** button will not work. Use **Choose
-CSV file** and pick `assets/sample-squad.csv` instead.
+(Browsers block `fetch()` from a page opened off disk, so the demo dataset
+also ships as `assets/sample-squad.js`, which loads as an ordinary script.
+Regenerate it with `node tools/make-sample-js.mjs` if you change the CSV.)
 
 ### Loading your results
 
@@ -170,6 +170,7 @@ npm run serve        # optional dev server on :8080
 | `src/store.js` | IndexedDB / localStorage persistence |
 | `src/app.js` | wiring |
 | `scraper/fetch_results.py` | the results fetcher |
+| `assets/sample-squad.{csv,js}` | demo dataset (the `.js` is generated from the `.csv`) |
 
 Plain `<script>` tags, no build step, no bundler — which is what lets
 `index.html` work straight from disk.
@@ -232,11 +233,11 @@ Plain `<script>` tags, no build step, no bundler — which is what lets
 
 ### Tests
 
-82 tests: 34 on the data and points engines, 18 on the scraper, and 30
+100 tests: 42 on the data and points engines, 18 on the scraper, and 40
 end-to-end tests driving a real browser against a real 150-swimmer dataset —
 checking import time, chart rendering, table virtualisation, sorting,
-filtering, escaping, persistence across a reload, and that the console stays
-clean throughout.
+filtering, escaping, persistence across a reload, that the app works from a
+`file://` URL, and that the console stays clean throughout.
 
 ---
 

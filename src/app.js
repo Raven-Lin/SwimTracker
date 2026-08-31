@@ -261,12 +261,34 @@
     U.toast(`${state.dataset.swimmers.size} swimmers loaded`);
   }
 
+  /**
+   * Fetch the demo dataset without using fetch().
+   *
+   * A page opened by double-clicking index.html has an opaque origin, so
+   * fetch() and XHR to a sibling file are treated as cross-origin and
+   * blocked — which broke "Load sample data" for the most obvious way to
+   * open the app. A classic <script> tag is exempt from that rule, so the
+   * same CSV also ships as assets/sample-squad.js, which assigns the text to
+   * a global. This path works identically from disk and over HTTP.
+   */
+  function loadSampleText() {
+    if (window.__SWIMTRACKER_SAMPLE__) return Promise.resolve(window.__SWIMTRACKER_SAMPLE__);
+    return new Promise((resolve, reject) => {
+      const script = document.createElement('script');
+      script.src = 'assets/sample-squad.js';
+      script.onload = () => {
+        if (window.__SWIMTRACKER_SAMPLE__) resolve(window.__SWIMTRACKER_SAMPLE__);
+        else reject(new Error('the sample file loaded but contained no data'));
+      };
+      script.onerror = () => reject(new Error('assets/sample-squad.js could not be loaded'));
+      document.head.appendChild(script);
+    });
+  }
+
   async function loadSample() {
-    U.busy(true, 'Loading sample data…');
+    U.busy(true, 'Loading sample data\u2026');
     try {
-      const res = await fetch('assets/sample-squad.csv');
-      if (!res.ok) throw new Error('HTTP ' + res.status);
-      const text = await res.text();
+      const text = await loadSampleText();
       const objs = D.parseCSVToObjects(text);
       const wasEmpty = state.rawRows.length === 0;
       state.rawRows = state.rawRows.concat(objs);
@@ -274,19 +296,18 @@
       state.rawRows = datasetToRawRows(state.dataset);
       await persistRows();
       showImportReport([
-        { kind: 'ok', title: 'Sample data loaded', body: `${objs.length} rows.` },
+        { kind: 'ok', title: 'Sample data loaded', body: `${objs.length} rows from a 24-swimmer demo squad.` },
         qualityReport(result, 0)
       ]);
       U.toast('Sample data loaded');
     } catch (err) {
-      // fetch() is blocked on file:// in most browsers. Say so plainly and
-      // point at the fix, rather than showing a bare network error.
+      // Only reachable if the file is genuinely missing from the download.
       showImportReport([{
         kind: 'warn',
-        title: 'Could not load the sample file',
-        body: 'Browsers block a page opened from disk from reading other files. ' +
-              'Use “Choose CSV file” and pick swimmer_results.csv yourself, or open ' +
-              'this dashboard from a web address instead.'
+        title: 'Could not load the sample data',
+        body: (err && err.message ? err.message + '. ' : '') +
+              'Use \u201cChoose CSV file\u201d and pick assets/sample-squad.csv from the ' +
+              'folder you unzipped, or your own results CSV.'
       }]);
     } finally {
       U.busy(false);

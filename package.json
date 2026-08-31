@@ -12,6 +12,7 @@
     "test:e2e": "node --test tests/e2e.test.mjs",
     "test:py": "python3 -m unittest discover -s tests -p \"test_*.py\"",
     "fixture": "node tools/make-fixture.mjs 150 tests/fixtures/squad-150.csv",
+    "sample": "node tools/make-sample-js.mjs",
     "screenshots": "node tools/screenshot.mjs http",
     "serve": "node tools/serve.mjs"
   },
