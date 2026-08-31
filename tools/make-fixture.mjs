@@ -9,7 +9,8 @@
    time, a duplicated row and a CRLF line ending.
 ============================================================================ */
 
-import { writeFileSync } from 'node:fs';
+import { writeFileSync, mkdirSync } from 'node:fs';
+import { dirname } from 'node:path';
 
 const count = parseInt(process.argv[2], 10) || 150;
 const outfile = process.argv[3] || 'tests/fixtures/squad-150.csv';
@@ -143,5 +144,9 @@ const csv = [COLS.join(',')]
   .concat(rows.map(r => COLS.map(c => esc(r[c] ?? '')).join(',')))
   .join('\r\n') + '\r\n';   // CRLF on purpose — this is what Excel writes
 
+// Create the output directory if it is missing. Generated fixtures are
+// gitignored, so on a fresh clone (CI included) tests/fixtures/ does not
+// exist yet and writeFileSync would fail with ENOENT.
+mkdirSync(dirname(outfile), { recursive: true });
 writeFileSync(outfile, csv, 'utf8');
 console.log(`${outfile}: ${count} swimmers, ${rows.length} rows, ${(csv.length / 1024).toFixed(0)} KB`);
