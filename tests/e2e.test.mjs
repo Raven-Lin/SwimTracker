@@ -256,6 +256,28 @@ test('all four swimmer charts render for the selected swimmer', async () => {
 });
 
 test('the progression chart plots dates, not just years', async () => {
+  // Pick a swimmer who has actually raced an event several times, rather than
+  // relying on whoever happens to sort first — the squad table's default sort
+  // is by name, so the first row is not necessarily an interesting swimmer.
+  const target = await page.evaluate(() => {
+    const ds = window.__swimtracker.state.dataset;
+    let best = null;
+    ds.swimmers.forEach(sw => {
+      sw.events.forEach(ev => {
+        if (!best || ev.races.length > best.count) {
+          best = { name: sw.name, eventKey: ev.eventKey, count: ev.races.length };
+        }
+      });
+    });
+    return best;
+  });
+  assert.ok(target && target.count > 1, `found ${target && target.count} races in one event`);
+
+  await page.selectOption('#sw-select', target.name);
+  await page.waitForTimeout(400);
+  await page.selectOption('#sw-event', target.eventKey);
+  await page.waitForTimeout(400);
+
   // The old build binned every swim into a calendar year, which hid tapers
   // and mid-season plateaus entirely.
   const xs = await page.evaluate(() => {

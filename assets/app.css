@@ -332,11 +332,18 @@ td.num, th.num { text-align: right; }
   max-width: 190px; overflow: hidden; text-overflow: ellipsis;
 }
 .heat td.cell {
-  text-align: center; padding: 4px 6px; border-radius: 4px;
-  font-variant-numeric: tabular-nums; font-weight: 600; min-width: 46px;
-  color: var(--grey-900);
+  text-align: center; padding: 4px 7px; border-radius: 4px;
+  font-variant-numeric: tabular-nums; font-weight: 600; min-width: 64px;
+  white-space: nowrap; color: var(--grey-900);
 }
 .heat td.cell.empty { background: var(--grey-100); color: var(--grey-300); font-weight: 400; }
+/* A swim we cannot score (no gender on the swimmer) still shows its time —
+   it just gets no colour, because there is nothing to rank it by. */
+.heat td.cell.unscored {
+  background: repeating-linear-gradient(45deg, var(--grey-50), var(--grey-50) 4px, #fff 4px, #fff 8px);
+  color: var(--grey-700); font-weight: 500;
+}
+.heat th { min-width: 64px; }
 
 .legend { display: flex; align-items: center; gap: 8px; font-size: .75rem; color: var(--grey-500); }
 .legend .swatches { display: flex; }

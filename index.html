@@ -150,15 +150,15 @@
   <div class="grid-2">
     <div class="card">
       <div class="card-head">
-        <h2>Form: season best vs personal best</h2>
-        <div class="hint">Each bar spans this season's best up to the all-time PB. Short green bar = swimming at their level now. Long amber bar = still climbing back.</div>
+        <h2>How far off their best</h2>
+        <div class="hint">Seconds between this season's best and the all-time PB, per event. Green = at their personal best. The longest bars are the events with the most to claw back.</div>
       </div>
       <div class="card-body"><div class="chart-wrap"><canvas id="chart-formgap"></canvas></div></div>
     </div>
     <div class="card">
       <div class="card-head">
         <h2>Event portfolio</h2>
-        <div class="hint">PB in every event on the points scale. The top bar is this swimmer's strongest event — which is often <em>not</em> the one with the fastest-looking time.</div>
+        <div class="hint">The one place points earn their keep: ranking a swimmer's own events against each other. A 1:18 breaststroke can be a better swim than a 1:00 freestyle, and raw times cannot tell you that. Hover any bar for the actual time.</div>
       </div>
       <div class="card-body"><div class="chart-wrap"><canvas id="chart-portfolio"></canvas></div></div>
     </div>
@@ -304,7 +304,7 @@
     </div>
     <div class="card-head" style="border-top:0">
       <h2>Event coverage</h2>
-      <div class="hint">Each cell is a swimmer's PB in that event, scored in points. <strong>The empty cells are the point</strong> — they show at a glance who has never raced an event, which is where relay gaps and untried talent hide.</div>
+      <div class="hint">Each cell is a swimmer's personal best time in that event. Colour shows relative strength, so you can scan across events as well as down them. <strong>The empty cells are the point</strong> — they show who has never raced an event, which is where relay gaps and untried talent hide.</div>
       <div class="spacer"></div>
       <span class="small muted" id="cov-count"></span>
     </div>

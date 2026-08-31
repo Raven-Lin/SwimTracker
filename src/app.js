@@ -554,27 +554,30 @@
           : '<span class="badge badge-warn" title="No gender set — cannot be scored in points">?</span>' },
       { key: 'ageGroup', label: 'Age', width: 56, align: 'right',
         render: r => r.ageGroup === null ? '<span class="muted">—</span>' : U.esc(r.ageGroup) },
-      { key: 'bestPoints', label: 'Best pts', width: 78, align: 'right',
-        render: r => r.bestPoints === null
-          ? '<span class="muted">—</span>'
-          : `<strong class="points">${r.bestPoints}</strong>` },
       { key: 'bestEvent', label: 'Strongest event', width: 168, sortable: true,
         sortValue: r => r.bestRace ? r.bestRace.eventKey : null,
         render: r => r.bestRace
-          ? `${U.esc(r.bestRace.course)} ${r.bestRace.distance} ${U.esc(r.bestRace.stroke)}`
+          ? `${U.esc(r.bestRace.course)} ${r.bestRace.distance} ${U.esc(P.strokeShort(r.bestRace.stroke))}`
           : '<span class="muted">—</span>' },
-      { key: 'bestTime', label: 'PB', width: 82, align: 'right',
+      { key: 'bestTime', label: 'PB', width: 86, align: 'right',
         sortValue: r => r.bestRace ? r.bestRace.seconds : null,
-        render: r => r.bestRace ? `<span class="time">${U.esc(r.bestRace.time)}</span>` : '—' },
-      { key: 'seasonPoints', label: 'Season pts', width: 90, align: 'right',
-        render: r => r.seasonPoints === null ? '<span class="muted">—</span>' : `<span class="points">${r.seasonPoints}</span>` },
-      { key: 'formGapPct', label: 'Form', width: 78, align: 'right',
+        render: r => r.bestRace ? `<strong class="time">${U.esc(r.bestRace.time)}</strong>` : '—' },
+      { key: 'seasonTime', label: 'Season best', width: 92, align: 'right',
+        sortValue: r => r.seasonRace ? r.seasonRace.seconds : null,
+        render: r => r.seasonRace
+          ? `<span class="time">${U.esc(r.seasonRace.time)}</span>`
+          : '<span class="muted">—</span>' },
+      { key: 'formGapPct', label: 'Form', width: 80, align: 'right',
         render: r => {
           if (r.formGapPct === null) return '<span class="muted">—</span>';
           if (r.formGapPct <= 0.005) return '<span class="badge badge-sb">At PB</span>';
           const cls = r.formGapPct < 2 ? 'pos-good' : 'pos-bad';
           return `<span class="${cls} num">+${r.formGapPct.toFixed(1)}%</span>`;
         } },
+      { key: 'bestPoints', label: 'Points', width: 72, align: 'right',
+        render: r => r.bestPoints === null
+          ? '<span class="muted">—</span>'
+          : `<span class="points muted">${r.bestPoints}</span>` },
       { key: 'raceCount', label: 'Races', width: 62, align: 'right' },
       { key: 'lastDate', label: 'Last raced', width: 96,
         sortValue: r => r.lastDate ? r.lastDate.getTime() : null,
@@ -587,8 +590,11 @@
     if (!squadTable) {
       squadTable = U.VirtualTable(container, squadColumns(), {
         rowHeight: 34,
-        sortKey: 'bestPoints',
-        sortAsc: false,
+        // Sort by name, not by points. Opening the squad view on a points
+        // league table makes the score feel like the subject; the roster is
+        // the subject, and points are one sortable column among several.
+        sortKey: 'name',
+        sortAsc: true,
         onRowClick: row => openSwimmer(row.name)
       });
     }
@@ -689,12 +695,15 @@
     sw.races.forEach(r => { if (r.isPB && r.season === state.dataset.currentSeason) seasonPBs++; });
 
     const stats = [
-      { v: sw.bestPoints === null ? '—' : sw.bestPoints, l: 'Best points',
-        sub: sw.bestPointsRace ? `${sw.bestPointsRace.course} ${sw.bestPointsRace.distance} ${sw.bestPointsRace.stroke}` : '' },
+      { v: sw.bestPointsRace ? sw.bestPointsRace.time : '—', l: 'Best swim',
+        sub: sw.bestPointsRace
+          ? `${sw.bestPointsRace.course} ${sw.bestPointsRace.distance} ${P.strokeShort(sw.bestPointsRace.stroke)}`
+          : '' },
+      { v: seasonPBs, l: 'PBs this season' },
       { v: sw.raceCount, l: 'Races' },
       { v: sw.eventCount, l: 'Events' },
-      { v: seasonPBs, l: 'PBs this season' },
-      { v: sw.gender || '?', l: 'Gender', sub: sw.gender ? '' : 'set it on the Data tab' },
+      { v: sw.bestPoints === null ? '—' : sw.bestPoints, l: 'Points',
+        sub: sw.bestPoints === null ? 'needs a gender' : 'for that swim' },
       { v: sw.ageGroup === null ? '—' : sw.ageGroup, l: 'Age group' },
       { v: sw.club || '—', l: 'Club' }
     ];
@@ -946,7 +955,7 @@
     // squad still gets a full spread of shading rather than one flat block.
     let min = Infinity, max = -Infinity;
     rows.forEach(r => r.cells.forEach(c => {
-      if (!c || c.points === null) return;
+      if (!c || c.points === null) return;   // unscored cells still render, just uncoloured
       if (c.points < min) min = c.points;
       if (c.points > max) max = c.points;
     }));
@@ -966,15 +975,28 @@
       parts.push('<tr>');
       parts.push(`<td class="rowhead" title="${U.esc(r.swimmer.name)}">${U.esc(r.swimmer.name)}</td>`);
       r.cells.forEach((c, i) => {
-        if (!c || c.points === null) {
+        if (!c) {
           parts.push('<td class="cell empty" title="Never raced">·</td>');
         } else {
-          const bg = U.heatColor(c.points, min, max);
-          const fg = U.heatTextColor(c.points, min, max);
           const e = matrix.events[i];
-          parts.push(`<td class="cell" style="background:${bg};color:${fg}" ` +
-            `title="${U.esc(r.swimmer.name)} — ${U.esc(P.eventLabel(e.course, e.distance, e.stroke))}: ` +
-            `${U.esc(c.race.time)} (${c.points} pts)">${c.points}</td>`);
+          // The CELL SHOWS THE TIME, not the points. Every column here is a
+          // single event, so times down a column are directly comparable —
+          // there is no need to abstract them into points to read the grid.
+          // Colour still encodes points, which is what makes strength
+          // comparable ACROSS columns; and a swimmer with no gender (so no
+          // points) still gets their times shown rather than a blank row.
+          const label = U.esc(c.race.time);
+          if (c.points === null) {
+            parts.push(`<td class="cell unscored" ` +
+              `title="${U.esc(r.swimmer.name)} — ${U.esc(P.eventLabel(e.course, e.distance, e.stroke))}: ` +
+              `${label} (no gender set, so not scored)">${label}</td>`);
+          } else {
+            const bg = U.heatColor(c.points, min, max);
+            const fg = U.heatTextColor(c.points, min, max);
+            parts.push(`<td class="cell" style="background:${bg};color:${fg}" ` +
+              `title="${U.esc(r.swimmer.name)} — ${U.esc(P.eventLabel(e.course, e.distance, e.stroke))}: ` +
+              `${label} (${c.points} pts)">${label}</td>`);
+          }
         }
       });
       parts.push('</tr>');

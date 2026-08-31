@@ -283,22 +283,30 @@
      ========================================================================== */
 
   /**
-   * One horizontal range bar per event, spanning this season's best up to the
-   * all-time PB, scored in points. A short bar means the swimmer is racing at
-   * their level right now; a long bar means there is a gap to close.
+   * How far off their personal best each event currently is, IN SECONDS.
+   *
+   * This used to be a range bar on the World Aquatics points scale. That was
+   * the wrong unit for the question: a coach does not ask "how many points
+   * off is she?", they ask "how far off her best is she?" — and the answer is
+   * "half a second" or "four seconds". Seconds are also what the swimmer
+   * hears in the pool.
+   *
+   * Seconds-off-PB works as a shared axis where raw times do not: a 50 Free
+   * and a 400 IM sit on utterly different time scales, but "1.2 seconds off"
+   * and "3.5 seconds off" are directly comparable, and zero means "at their
+   * best" in every event. The bar starts at a true zero, so bar length is an
+   * honest quantity.
    */
   function formGap(canvasId, swimmer, opts) {
     const settings = opts || {};
     const rows = [];
     swimmer.events.forEach(ev => {
-      if (!ev.pb || ev.pb.points === null) return;
-      if (!ev.seasonBest || ev.seasonBest.points === null) return;
+      if (!ev.pb || !ev.seasonBest) return;
+      if (ev.sbToPbGapSec === null || ev.sbToPbGapSec === undefined) return;
       rows.push({
         label: `${ev.course} ${ev.distance} ${P.strokeShort(ev.stroke)}`,
-        sb: ev.seasonBest.points,
-        pb: ev.pb.points,
+        gapSec: Math.max(0, ev.sbToPbGapSec),
         gapPct: ev.sbToPbGapPct || 0,
-        gapSec: ev.sbToPbGapSec || 0,
         ev
       });
     });
@@ -308,29 +316,27 @@
         ? `${swimmer.name} has not raced in the ${settings.seasonLabel} season, so there is no season best to compare against their PBs yet.`
         : `${swimmer.name} has no season best to compare against their PBs yet.`);
     }
-    rows.sort((a, b) => b.pb - a.pb);
+
+    // Biggest gap first: the events with the most to claw back are the ones
+    // worth a conversation.
+    rows.sort((a, b) => b.gapSec - a.gapSec);
     const shown = rows.slice(0, settings.limit || 12);
 
     return make(canvasId, {
       type: 'bar',
       data: {
         labels: shown.map(r => r.label),
-        datasets: [
-          {
-            label: 'Season best → personal best',
-            // Floating bars: [start, end]. The bar IS the gap.
-            data: shown.map(r => [r.sb, r.pb]),
-            backgroundColor: shown.map(r =>
-              r.gapPct <= 0.01 ? 'rgba(21,128,61,.75)'      // at PB — in form
-                : r.gapPct < 2 ? 'rgba(0,134,184,.65)'      // within touching distance
-                : 'rgba(224,148,0,.6)'),                    // work to do
-            borderColor: shown.map(r =>
-              r.gapPct <= 0.01 ? '#15803d' : r.gapPct < 2 ? '#0086b8' : '#e09400'),
-            borderWidth: 1,
-            borderRadius: 3,
-            barPercentage: 0.72
-          }
-        ]
+        datasets: [{
+          label: 'Seconds off personal best',
+          data: shown.map(r => r.gapSec),
+          backgroundColor: shown.map(r =>
+            r.gapSec <= 0.005 ? 'rgba(21,128,61,.75)'      // at their PB
+              : r.gapPct < 2 ? 'rgba(0,134,184,.65)'       // within touching distance
+              : 'rgba(224,148,0,.65)'),                    // work to do
+          borderColor: shown.map(r =>
+            r.gapSec <= 0.005 ? '#15803d' : r.gapPct < 2 ? '#0086b8' : '#e09400'),
+          borderWidth: 1, borderRadius: 3, barPercentage: 0.72
+        }]
       },
       options: merge(BASE_OPTS, {
         indexAxis: 'y',
@@ -341,9 +347,11 @@
               label: ctx => {
                 const r = shown[ctx.dataIndex];
                 return [
-                  ` Season best: ${D.secondsToTime(r.ev.seasonBest.seconds)} (${r.sb} pts)`,
-                  ` Personal best: ${D.secondsToTime(r.ev.pb.seconds)} (${r.pb} pts)`,
-                  ` Gap: ${r.gapSec <= 0 ? 'at PB' : D.formatDelta(r.gapSec) + 's · ' + r.gapPct.toFixed(1) + '%'}`
+                  ` Season best: ${D.secondsToTime(r.ev.seasonBest.seconds)}`,
+                  ` Personal best: ${D.secondsToTime(r.ev.pb.seconds)}`,
+                  r.gapSec <= 0.005
+                    ? ' At their personal best'
+                    : ` ${r.gapSec.toFixed(2)}s off (${r.gapPct.toFixed(1)}%)`
                 ];
               }
             }
@@ -351,8 +359,9 @@
         },
         scales: {
           x: {
-            title: { display: true, text: 'World Aquatics points', font: FONT },
-            ticks: { font: FONT },
+            beginAtZero: true,
+            title: { display: true, text: 'Seconds off their personal best (0 = at their best)', font: FONT },
+            ticks: { font: FONT, callback: v => v === 0 ? '0' : v.toFixed(1) + 's' },
             grid: { color: 'rgba(15,23,42,.07)' }
           },
           y: { ticks: { font: FONT }, grid: { display: false } }
