@@ -1,22 +1,96 @@
-name: Build Windows
+# SwimTracker CI + deploy
+#
+# What changed and why
+# --------------------
+# This workflow used to build a Windows .exe installer with electron-builder.
+# The app no longer needs installing: it is a static page. So instead of
+# producing an installer nobody has to download, the workflow now runs the
+# test suites and publishes the dashboard to GitHub Pages, where any coach can
+# open it from a link on any device.
+#
+# To turn the Pages deploy on (once): repository Settings -> Pages ->
+# "Build and deployment" -> Source: "GitHub Actions".
+
+name: CI and deploy
 
 on:
   push:
     branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# Pages deployment needs these; nothing else in the repo does.
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Never run two deploys at once, but let a queued one finish rather than
+# cancelling it — a half-deployed dashboard is worse than a slightly stale one.
+concurrency:
+  group: pages
+  cancel-in-progress: false
 
 jobs:
-  build-win:
-    runs-on: windows-latest
-    env:
-      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  test:
+    name: Tests
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-node@v4
         with:
-          node-version: 18
-      - run: npm install
-      - run: npm run build:win
-      - uses: actions/upload-artifact@v4
+          node-version: 20
+          cache: npm
+
+      - uses: actions/setup-python@v5
         with:
-          name: SwimTracker-Windows
-          path: dist/*.exe
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Chromium for the browser tests
+        run: npx playwright install --with-deps chromium
+
+      - name: Generate the 150-swimmer test fixture
+        run: npm run fixture
+
+      - name: Data and points engine tests
+        run: npm run test:unit
+
+      - name: Scraper tests
+        run: npm run test:py
+
+      - name: End-to-end browser tests
+        run: npm run test:e2e
+
+  deploy:
+    name: Publish to GitHub Pages
+    needs: test
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/configure-pages@v5
+
+      # The whole app is static, so the repository IS the build output. Only
+      # the development-only directories are stripped.
+      - name: Assemble the site
+        run: |
+          mkdir -p _site
+          cp index.html _site/
+          cp -r assets _site/
+          cp -r src _site/
+          cp swimmer_results.csv _site/ 2>/dev/null || true
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+      - id: deployment
+        uses: actions/deploy-pages@v4
