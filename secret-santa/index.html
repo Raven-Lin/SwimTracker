@@ -17,16 +17,16 @@
     --ground-2: #fde3e1;
     --ink: #2b2226;
     --muted: #7a6a6e;
-    --line: #cfe5d8;
+    --line: #f3c9c6;
     --field: #ffffff;
     --accent: #d6313f;
     --accent-ink: #ffffff;
-    --accent-2: #2f8a5f;
-    --accent-2-soft: #e6f4ec;
+    --accent-2: #b8283a;
+    --accent-2-soft: #fdeceb;
     --tag: #ffffff;
     --tag-2: #ffeceb;
     --tag-ink: #3b2a2e;
-    --string: #2f8a5f;
+    --string: #d6313f;
     --error: #d6313f;
     --display: "Gloock", "Noto Serif SC", "Songti SC", Georgia, serif;
     --body: "Figtree", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
@@ -157,7 +157,7 @@
   <header>
     <div class="eyebrow">Secret Santa · 神秘圣诞老人</div>
     <h1>Who's your person?</h1>
-    <p class="sub">Type your name to see who you're buying for.<br>输入你的名字，看看你要送礼物给谁。</p>
+    <p class="sub">A fish looks at you<br>一只鱼在注视你</p>
   </header>
 
   <div class="tag-wrap">
@@ -189,7 +189,7 @@
 
 <script>
   // Drawn once in advance as a single loop: nobody gets themselves and no two people draw each other.
-  const DRAW = JSON.parse(new TextDecoder().decode(Uint8Array.from(atob("eyLlsI/pvpnomb4iOiAiVmFuZXNzYSIsICJWYW5lc3NhIjogIua1t+m4oSIsICLmtbfpuKEiOiAi54K46bG8IiwgIueCuOmxvCI6ICLolq/mnaEiLCAi6Jav5p2hIjogIk9saXZpYSIsICJPbGl2aWEiOiAi5bCP6b6Z6Jm+In0="), c => c.charCodeAt(0))));
+  const DRAW = JSON.parse(new TextDecoder().decode(Uint8Array.from(atob("eyLlsI/pvpnomb4iOiAiVmFuIiwgIlZhbiI6ICLmtbfpuKEiLCAi5rW36bihIjogIueCuOmxvCIsICLngrjpsbwiOiAi6Jav5p2hIiwgIuiWr+adoSI6ICJPbGl2ZSIsICJPbGl2ZSI6ICLlsI/pvpnomb4ifQ=="), c => c.charCodeAt(0))));
 
   // Extra spellings accepted for a name (compared after normalizing).
   const ALIASES = {
