@@ -316,9 +316,48 @@
    * in the old charts.
    */
   const PALETTE = [
-    '#0086b8', '#e09400', '#15803d', '#b91c1c', '#7c3aed',
-    '#0891b2', '#c2410c', '#4d7c0f', '#be185d', '#1e40af'
+    '#2f7ba8', '#b5762a', '#276848', '#a8475c', '#7565b5',
+    '#2d8f9e', '#8f5c1f', '#5f8a3f', '#9a4a86', '#41618f'
   ];
+
+  /**
+   * THEME — the single source of truth for every colour a chart draws.
+   *
+   * These values mirror the CSS custom properties in assets/app.css. They are
+   * duplicated rather than read from getComputedStyle so that charts render
+   * identically under Node (the unit tests import this module with no DOM) and
+   * so a missing stylesheet degrades to a readable chart instead of a blank
+   * one. Change a colour in both places, or the charts drift from the page.
+   *
+   * Anything named *Soft* or *Fill* is a translucent area fill and must never
+   * carry text — only the solid values clear contrast requirements.
+   */
+  const THEME = {
+    accent:     '#2f7ba8',
+    accentSoft: 'rgba(47,123,168,.62)',
+    accentFill: 'rgba(47,123,168,.50)',
+    warm:       '#b5762a',
+    warmSoft:   'rgba(181,118,42,.62)',
+    warmDeep:   '#8f5c1f',
+    green:      '#276848',
+    greenSoft:  'rgba(39,104,72,.72)',
+    red:        '#b0384a',
+    redSoft:    'rgba(176,56,74,.68)',
+    deep:       '#41618f',
+    white:      '#ffffff',
+    /* Grid lines are tinted with the page blue: a neutral grey grid reads as a
+       smudge once the surface behind it is no longer neutral. */
+    gridFaint:  'rgba(65,97,143,.07)',
+    grid:       'rgba(65,97,143,.11)',
+    gridStrong: 'rgba(65,97,143,.15)',
+    tooltipBg:  'rgba(22,33,47,.94)'
+  };
+
+  /** One hue per stroke, held here so the page and the charts agree. */
+  const STROKE_COLORS = {
+    Freestyle: THEME.accent, Backstroke: '#7565b5',
+    Breaststroke: THEME.green, Butterfly: THEME.warm, Medley: THEME.red
+  };
 
   function colorFor(i) {
     if (i < PALETTE.length) return PALETTE[i];
@@ -329,7 +368,7 @@
 
   /**
    * Heatmap colour for a points value.
-   * A single hue ramp (pale -> deep aqua) rather than red-to-green: it reads
+   * A single hue ramp (pale -> deep blue) rather than red-to-green: it reads
    * correctly for the ~8% of men with red/green colour blindness, and keeps
    * the ordering obvious in greyscale when a coach prints the page.
    */
@@ -337,9 +376,9 @@
     if (points === null || points === undefined) return null;
     const span = Math.max(1, max - min);
     const t = Math.max(0, Math.min(1, (points - min) / span));
-    const light = 95 - t * 52;      // 95% -> 43%
-    const sat = 30 + t * 45;
-    return `hsl(196 ${sat.toFixed(0)}% ${light.toFixed(0)}%)`;
+    const light = 96 - t * 54;      // 96% -> 42%
+    const sat = 34 + t * 40;
+    return `hsl(205 ${sat.toFixed(0)}% ${light.toFixed(0)}%)`;
   }
 
   /** Black or white text, whichever stays readable on the given lightness. */
@@ -347,11 +386,12 @@
     if (points === null || points === undefined) return 'inherit';
     const span = Math.max(1, max - min);
     const t = Math.max(0, Math.min(1, (points - min) / span));
-    return (95 - t * 52) < 62 ? '#ffffff' : '#0f172a';
+    return (96 - t * 54) < 62 ? '#ffffff' : '#16212f';
   }
 
   return {
     esc, $, $$, el, setHTML, debounce, nextFrame, toast, busy, download,
-    fillSelect, VirtualTable, PALETTE, colorFor, heatColor, heatTextColor
+    fillSelect, VirtualTable, PALETTE, THEME, STROKE_COLORS,
+    colorFor, heatColor, heatTextColor
   };
 });

@@ -16,9 +16,10 @@
   to be opened straight from disk with no internet connection at all, so a
   blocked font request must never change the layout.
 -->
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap">
+<!-- No webfont. The dashboard is documented as making zero network requests and
+     working from a file:// URL; a Google Fonts <link> broke both — it failed behind
+     a school content filter and logged a console error offline. The system stack in
+     --sans renders the same layout, so nothing is lost by dropping it. -->
 <link rel="stylesheet" href="assets/app.css">
 
 <!--
@@ -142,7 +143,7 @@
   <div class="card">
     <div class="card-head">
       <h2>Personal best progression</h2>
-      <div class="hint">Every race at its actual meet date. The gold stepped line is the personal best — it holds flat until it is broken, which is what a PB genuinely does. Triangles mark new bests. Faster times sit higher.</div>
+      <div class="hint">Every race at its actual meet date. The amber stepped line is the personal best — it holds flat until it is broken, which is what a PB genuinely does. Triangles mark new bests. Faster times sit higher.</div>
     </div>
     <div class="card-body"><div class="chart-wrap"><canvas id="chart-progression"></canvas></div></div>
   </div>
@@ -223,7 +224,7 @@
     </div>
     <div class="card-head" style="border-top:0">
       <h2 id="ev-title">Event rankings</h2>
-      <div class="hint">Filter by age group before comparing — ranking a 12&nbsp;y/o against a 17&nbsp;y/o on raw time tells you nothing useful. The gold marker is the fastest in the filtered field. Ranking by <strong>Time</strong> draws a dot plot (no misleading bar lengths); ranking by <strong>Points</strong> draws bars, because points have a true zero.</div>
+      <div class="hint">Filter by age group before comparing — ranking a 12&nbsp;y/o against a 17&nbsp;y/o on raw time tells you nothing useful. The amber marker is the fastest in the filtered field. Ranking by <strong>Time</strong> draws a dot plot (no misleading bar lengths); ranking by <strong>Points</strong> draws bars, because points have a true zero.</div>
     </div>
     <div class="card-body"><div class="chart-wrap tall"><canvas id="chart-ranking"></canvas></div></div>
   </div>

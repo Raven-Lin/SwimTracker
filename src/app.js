@@ -242,23 +242,43 @@
     }
 
     const before = state.rawRows.length;
-    incoming.forEach(i => { state.rawRows = state.rawRows.concat(i.rows); });
 
-    const result = rebuild({ autoNavigate: before === 0 });
+    // Everything past this point runs behind the busy overlay, which covers
+    // the whole viewport. Without the finally, a throw in rebuild() or
+    // persistRows() left the overlay up for good: the app looked frozen mid
+    // import, with no error anywhere and every control unclickable. The same
+    // failure mode as the v1 scrape that stuck its progress bar forever.
+    try {
+      incoming.forEach(i => { state.rawRows = state.rawRows.concat(i.rows); });
 
-    // Persist the deduplicated, canonical form rather than the raw imports —
-    // this is what stops the stored file growing every time a coach re-imports.
-    state.rawRows = datasetToRawRows(state.dataset);
-    await persistRows();
+      const result = rebuild({ autoNavigate: before === 0 });
 
-    U.busy(false);
+      // Persist the deduplicated, canonical form rather than the raw imports —
+      // this is what stops the stored file growing every time a coach re-imports.
+      state.rawRows = datasetToRawRows(state.dataset);
+      await persistRows();
 
-    incoming.forEach(i => reports.push({
-      kind: 'ok', title: `Imported ${i.file}`, body: `${i.rows.length} rows read.`
-    }));
-    reports.push(qualityReport(result, before));
-    showImportReport(reports);
-    U.toast(`${state.dataset.swimmers.size} swimmers loaded`);
+      incoming.forEach(i => reports.push({
+        kind: 'ok', title: `Imported ${i.file}`, body: `${i.rows.length} rows read.`
+      }));
+      reports.push(qualityReport(result, before));
+      showImportReport(reports);
+      U.toast(`${state.dataset.swimmers.size} swimmers loaded`);
+    } catch (err) {
+      // Roll the rows back so a failed import cannot leave a half-built
+      // dataset that every later import compounds.
+      state.rawRows = state.rawRows.slice(0, before);
+      reports.push({
+        kind: 'error',
+        title: 'The import failed part way through',
+        body: (err && err.message ? err.message + '. ' : '') +
+              'Your existing data has been left as it was. If this repeats, ' +
+              'export a backup from the Data tab and check the file for odd rows.'
+      });
+      showImportReport(reports);
+    } finally {
+      U.busy(false);
+    }
   }
 
   /**

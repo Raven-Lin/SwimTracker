@@ -116,6 +116,10 @@
 
   const FONT = { family: '"DM Sans", system-ui, sans-serif', size: 11 };
 
+  /* Colour lives in the UI module so the page and the charts cannot drift. */
+  const T = U.THEME;
+  const STROKE_COLORS = U.STROKE_COLORS;
+
   const BASE_OPTS = {
     responsive: true,
     maintainAspectRatio: false,
@@ -124,7 +128,7 @@
     plugins: {
       legend: { labels: { font: FONT, usePointStyle: true, boxWidth: 8, padding: 12 } },
       tooltip: {
-        backgroundColor: 'rgba(15,23,42,.94)',
+        backgroundColor: T.tooltipBg,
         titleFont: FONT, bodyFont: FONT,
         padding: 10, cornerRadius: 6, displayColors: true, boxWidth: 8
       }
@@ -140,10 +144,6 @@
     return out;
   }
 
-  const STROKE_COLORS = {
-    Freestyle: '#0086b8', Backstroke: '#7c3aed',
-    Breaststroke: '#15803d', Butterfly: '#e09400', Medley: '#b91c1c'
-  };
 
   function fmtDateShort(ms) {
     const d = new Date(ms);
@@ -211,7 +211,7 @@
             data: stepped,
             type: 'line',
             stepped: 'before',
-            borderColor: '#e09400',
+            borderColor: T.warm,
             borderWidth: 2,
             borderDash: [],
             pointRadius: 0,
@@ -221,8 +221,8 @@
           {
             label: 'Race',
             data: points,
-            backgroundColor: 'rgba(0,134,184,.5)',
-            borderColor: '#0086b8',
+            backgroundColor: T.accentFill,
+            borderColor: T.accent,
             borderWidth: 1,
             pointRadius: 4,
             pointHoverRadius: 6,
@@ -231,8 +231,8 @@
           {
             label: 'New PB',
             data: newPBs,
-            backgroundColor: '#e09400',
-            borderColor: '#fff',
+            backgroundColor: T.warm,
+            borderColor: T.white,
             borderWidth: 1.5,
             pointRadius: 6,
             pointStyle: 'triangle',
@@ -264,14 +264,14 @@
             type: 'linear',
             title: { display: false },
             ticks: { font: FONT, callback: v => fmtDateShort(v), maxRotation: 0, autoSkipPadding: 22 },
-            grid: { color: 'rgba(15,23,42,.05)' }
+            grid: { color: T.gridFaint }
           },
           y: {
             // Faster is up. See the header note — this is not optional.
             reverse: true,
             title: { display: true, text: 'Time (faster is higher)', font: FONT },
             ticks: { font: FONT, callback: v => D.secondsToTime(v) },
-            grid: { color: 'rgba(15,23,42,.07)' }
+            grid: { color: T.grid }
           }
         }
       })
@@ -330,11 +330,11 @@
           label: 'Seconds off personal best',
           data: shown.map(r => r.gapSec),
           backgroundColor: shown.map(r =>
-            r.gapSec <= 0.005 ? 'rgba(21,128,61,.75)'      // at their PB
-              : r.gapPct < 2 ? 'rgba(0,134,184,.65)'       // within touching distance
-              : 'rgba(224,148,0,.65)'),                    // work to do
+            r.gapSec <= 0.005 ? T.greenSoft      // at their PB
+              : r.gapPct < 2 ? T.accentSoft       // within touching distance
+              : T.warmSoft),                    // work to do
           borderColor: shown.map(r =>
-            r.gapSec <= 0.005 ? '#15803d' : r.gapPct < 2 ? '#0086b8' : '#e09400'),
+            r.gapSec <= 0.005 ? T.green : r.gapPct < 2 ? T.accent : T.warm),
           borderWidth: 1, borderRadius: 3, barPercentage: 0.72
         }]
       },
@@ -362,7 +362,7 @@
             beginAtZero: true,
             title: { display: true, text: 'Seconds off their personal best (0 = at their best)', font: FONT },
             ticks: { font: FONT, callback: v => v === 0 ? '0' : v.toFixed(1) + 's' },
-            grid: { color: 'rgba(15,23,42,.07)' }
+            grid: { color: T.grid }
           },
           y: { ticks: { font: FONT }, grid: { display: false } }
         }
@@ -410,8 +410,8 @@
         datasets: [{
           label: 'PB (points)',
           data: shown.map(r => r.points),
-          backgroundColor: shown.map(r => (STROKE_COLORS[r.stroke] || '#0086b8') + 'cc'),
-          borderColor: shown.map(r => STROKE_COLORS[r.stroke] || '#0086b8'),
+          backgroundColor: shown.map(r => (STROKE_COLORS[r.stroke] || T.accent) + 'cc'),
+          borderColor: shown.map(r => STROKE_COLORS[r.stroke] || T.accent),
           borderWidth: 1, borderRadius: 3, barPercentage: 0.75
         }]
       },
@@ -432,7 +432,7 @@
         scales: {
           x: {
             title: { display: true, text: 'World Aquatics points', font: FONT },
-            beginAtZero: true, ticks: { font: FONT }, grid: { color: 'rgba(15,23,42,.07)' }
+            beginAtZero: true, ticks: { font: FONT }, grid: { color: T.grid }
           },
           y: { ticks: { font: FONT }, grid: { display: false } }
         }
@@ -460,8 +460,8 @@
         datasets: [{
           label: 'Swimmers',
           data: bins.map(b => b.count),
-          backgroundColor: 'rgba(0,134,184,.68)',
-          borderColor: '#0086b8', borderWidth: 1,
+          backgroundColor: T.accentSoft,
+          borderColor: T.accent, borderWidth: 1,
           borderRadius: 3, barPercentage: 0.92, categoryPercentage: 0.95
         }]
       },
@@ -480,7 +480,7 @@
                ticks: { font: FONT, maxRotation: 0, autoSkip: true }, grid: { display: false } },
           y: { title: { display: true, text: 'Swimmers', font: FONT },
                beginAtZero: true, ticks: { font: FONT, precision: 0 },
-               grid: { color: 'rgba(15,23,42,.07)' } }
+               grid: { color: T.grid } }
         }
       })
     });
@@ -512,8 +512,8 @@
         datasets: [{
           label: 'Points gained',
           data: shown.map(r => r.gain),
-          backgroundColor: shown.map(r => r.gain >= 0 ? 'rgba(21,128,61,.72)' : 'rgba(185,28,28,.7)'),
-          borderColor: shown.map(r => r.gain >= 0 ? '#15803d' : '#b91c1c'),
+          backgroundColor: shown.map(r => r.gain >= 0 ? T.greenSoft : T.redSoft),
+          borderColor: shown.map(r => r.gain >= 0 ? T.green : T.red),
           borderWidth: 1, borderRadius: 3, barPercentage: 0.8
         }]
       },
@@ -536,7 +536,7 @@
         },
         scales: {
           x: { title: { display: true, text: 'World Aquatics points gained', font: FONT },
-               ticks: { font: FONT }, grid: { color: 'rgba(15,23,42,.07)' } },
+               ticks: { font: FONT }, grid: { color: T.grid } },
           y: { ticks: { font: FONT, autoSkip: false }, grid: { display: false } }
         }
       })
@@ -604,8 +604,8 @@
           datasets: [{
             label: 'PB (points)',
             data: shown.map(r => r.points),
-            backgroundColor: shown.map(r => r.points === best ? 'rgba(224,148,0,.85)' : 'rgba(0,134,184,.6)'),
-            borderColor: shown.map(r => r.points === best ? '#e09400' : '#0086b8'),
+            backgroundColor: shown.map(r => r.points === best ? T.warmSoft : T.accentSoft),
+            borderColor: shown.map(r => r.points === best ? T.warm : T.accent),
             borderWidth: 1, borderRadius: 3, barPercentage: 0.8
           }]
         },
@@ -614,7 +614,7 @@
           plugins: { legend: { display: false }, tooltip: { callbacks: tooltipCallbacks } },
           scales: {
             x: { title: { display: true, text: 'World Aquatics points', font: FONT },
-                 beginAtZero: true, ticks: { font: FONT }, grid: { color: 'rgba(15,23,42,.07)' } },
+                 beginAtZero: true, ticks: { font: FONT }, grid: { color: T.grid } },
             y: { ticks: { font: FONT, autoSkip: false }, grid: { display: false } }
           }
         })
@@ -636,8 +636,8 @@
         datasets: [{
           label: 'Personal best',
           data: shown.map(r => ({ x: r.seconds, y: r.name })),
-          backgroundColor: shown.map(r => r.seconds === min ? '#e09400' : 'rgba(0,134,184,.75)'),
-          borderColor: shown.map(r => r.seconds === min ? '#b87700' : '#0086b8'),
+          backgroundColor: shown.map(r => r.seconds === min ? T.warm : T.accentSoft),
+          borderColor: shown.map(r => r.seconds === min ? T.warmDeep : T.accent),
           borderWidth: 1.5,
           pointRadius: shown.map(r => r.seconds === min ? 7 : 5),
           pointHoverRadius: 9
@@ -667,12 +667,12 @@
             min: Math.max(0, min - pad), max: max + pad,
             title: { display: true, text: 'Personal best (faster is further right)', font: FONT },
             ticks: { font: FONT, callback: v => D.secondsToTime(v) },
-            grid: { color: 'rgba(15,23,42,.07)' }
+            grid: { color: T.grid }
           },
           y: {
             type: 'category', labels: names, offset: true,
             ticks: { font: FONT, autoSkip: false },
-            grid: { color: 'rgba(15,23,42,.045)' }
+            grid: { color: T.gridFaint }
           }
         }
       })
@@ -753,12 +753,12 @@
                ticks: { font: FONT }, grid: { display: false } },
           y: usePoints ? {
             title: { display: true, text: 'Season-best points', font: FONT },
-            ticks: { font: FONT }, grid: { color: 'rgba(15,23,42,.07)' }
+            ticks: { font: FONT }, grid: { color: T.grid }
           } : {
             reverse: true,
             title: { display: true, text: 'Season-best time (faster is higher)', font: FONT },
             ticks: { font: FONT, callback: v => D.secondsToTime(v) },
-            grid: { color: 'rgba(15,23,42,.07)' }
+            grid: { color: T.grid }
           }
         }
       })
@@ -803,8 +803,8 @@
     const datasets = Array.from(series.entries()).map(([stroke, pts]) => ({
       label: stroke,
       data: pts,
-      backgroundColor: (STROKE_COLORS[stroke] || '#0086b8') + '99',
-      borderColor: STROKE_COLORS[stroke] || '#0086b8',
+      backgroundColor: (STROKE_COLORS[stroke] || T.accent) + '99',
+      borderColor: STROKE_COLORS[stroke] || T.accent,
       borderWidth: 1, pointRadius: 4, pointHoverRadius: 6
     }));
 
@@ -829,11 +829,11 @@
         scales: {
           x: { type: 'linear',
                ticks: { font: FONT, callback: v => fmtDateShort(v), maxRotation: 0, autoSkipPadding: 22 },
-               grid: { color: 'rgba(15,23,42,.05)' } },
+               grid: { color: T.gridFaint } },
           y: { title: { display: true, text: '% off personal best (lower is better)', font: FONT },
                beginAtZero: true,
                ticks: { font: FONT, callback: v => v.toFixed(1) + '%' },
-               grid: { color: 'rgba(15,23,42,.07)' } }
+               grid: { color: T.grid } }
         }
       })
     });

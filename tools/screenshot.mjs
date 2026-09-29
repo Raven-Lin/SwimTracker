@@ -69,6 +69,11 @@ console.log(`  ${info.swimmers} swimmers, ${info.races} races, storage=${info.st
 if (info.storage.lastError) console.log('  storage note:', info.storage.lastError);
 
 for (const tab of ['squad', 'swimmer', 'events', 'coverage', 'results', 'data']) {
+  // Wait for the busy overlay to clear first. It covers the whole viewport, so
+  // clicking a tab while a rebuild is in flight fails with "intercepts pointer
+  // events" — a fixed sleep raced it at 150 swimmers.
+  await page.waitForFunction(
+    () => document.getElementById('busy')?.hasAttribute('hidden'), { timeout: 30000 });
   await page.click('#tab-' + tab);
   await page.waitForTimeout(1100);
   await page.screenshot({ path: join(OUT, `${MODE}-${tab}.png`), fullPage: false });
