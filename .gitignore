@@ -1,0 +1,9 @@
+node_modules/
+dist/
+_site/
+tests/screenshots/
+tests/fixtures/
+*.tmp
+.DS_Store
+__pycache__/
+*.pyc

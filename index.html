@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SwimTracker — Squad Dashboard</title>
+<meta name="description" content="Offline squad analytics for swim coaches. No server, no install.">
+<meta name="color-scheme" content="light">
+
+<!-- Inline SVG favicon: no extra request, and no 404 when opened from disk. -->
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%2312305c'/%3E%3Cpath d='M4 20c3 0 3-3 6-3s3 3 6 3 3-3 6-3 3 3 6 3' stroke='%230086b8' stroke-width='2.6' fill='none' stroke-linecap='round'/%3E%3Cpath d='M4 25c3 0 3-3 6-3s3 3 6 3 3-3 6-3 3 3 6 3' stroke='%23e09400' stroke-width='2.6' fill='none' stroke-linecap='round'/%3E%3Ccircle cx='21' cy='10' r='3.2' fill='%23fff'/%3E%3C/svg%3E">
+
+<!--
+  Fonts are loaded from Google Fonts when a network is available, but every
+  rule in app.css declares a full system fallback stack. The app is designed
+  to be opened straight from disk with no internet connection at all, so a
+  blocked font request must never change the layout.
+-->
+<!-- No webfont. The dashboard is documented as making zero network requests and
+     working from a file:// URL; a Google Fonts <link> broke both — it failed behind
+     a school content filter and logged a console error offline. The system stack in
+     --sans renders the same layout, so nothing is lost by dropping it. -->
+<link rel="stylesheet" href="assets/app.css">
+
+<!--
+  Chart.js is VENDORED into the repository rather than pulled from a CDN.
+  A coach opening this file on poolside wifi, or from a USB stick, or on a
+  school laptop behind a content filter, still gets working charts.
+-->
+<script src="assets/vendor/chart.umd.js"></script>
+</head>
+<body>
+
+<a class="skip-link" href="#main">Skip to content</a>
+
+<header class="app-bar">
+  <div class="app-bar-inner">
+    <div class="brand"><span class="mark">S</span>Swim<em>Tracker</em></div>
+    <nav class="tabs" role="tablist" aria-label="Sections">
+      <button class="tab" role="tab" id="tab-squad"    data-panel="squad"    aria-selected="false" disabled>Squad</button>
+      <button class="tab" role="tab" id="tab-swimmer"  data-panel="swimmer"  aria-selected="false" disabled>Swimmer</button>
+      <button class="tab" role="tab" id="tab-events"   data-panel="events"   aria-selected="false" disabled>Events</button>
+      <button class="tab" role="tab" id="tab-coverage" data-panel="coverage" aria-selected="false" disabled>Coverage</button>
+      <button class="tab" role="tab" id="tab-results"  data-panel="results"  aria-selected="false" disabled>Results</button>
+      <button class="tab" role="tab" id="tab-data"     data-panel="data"     aria-selected="true">Data</button>
+    </nav>
+    <div class="meta">
+      <label for="season-select" class="season-label" hidden>Season</label>
+      <select id="season-select" hidden
+              title="Which season counts as the current one for season bests and the improvement leaderboard"></select>
+      <span id="meta-summary">No data loaded</span>
+    </div>
+  </div>
+</header>
+
+<main id="main">
+
+<!-- ══════════════════════════════════════════════════════════════════════
+     SQUAD  — the 150-swimmer overview
+     ══════════════════════════════════════════════════════════════════════ -->
+<section class="panel stack" id="panel-squad" role="tabpanel" aria-labelledby="tab-squad" hidden>
+
+  <div class="stats" id="squad-stats"></div>
+
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-head">
+        <h2>Squad standard</h2>
+        <div class="hint">Every swimmer's best swim, scored on the World Aquatics points scale. One bar is one group of swimmers — this is the shape of your squad.</div>
+      </div>
+      <div class="card-body"><div class="chart-wrap tall"><canvas id="chart-distribution"></canvas></div></div>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <h2>Who is improving</h2>
+        <div class="hint">Points gained this season against each swimmer's previous best. Points, not seconds, so a 12&nbsp;y/o 50 Free and a 17&nbsp;y/o 400 IM rank fairly against each other.</div>
+        <div class="spacer"></div>
+        <div class="field">
+          <label for="imp-limit">Show</label>
+          <select id="imp-limit">
+            <option value="10">Top 10</option>
+            <option value="20" selected>Top 20</option>
+            <option value="30">Top 30</option>
+          </select>
+        </div>
+      </div>
+      <div class="card-body"><div class="chart-wrap tall"><canvas id="chart-improvement"></canvas></div></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="toolbar">
+      <div class="field">
+        <label for="squad-search">Search</label>
+        <input type="search" id="squad-search" placeholder="Swimmer or club…" autocomplete="off">
+      </div>
+      <div class="field">
+        <label for="squad-gender">Gender</label>
+        <select id="squad-gender">
+          <option value="all">All</option>
+          <option value="F">Female</option>
+          <option value="M">Male</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="squad-age">Age group</label>
+        <select id="squad-age"><option value="all">All ages</option></select>
+      </div>
+      <div class="spacer" style="margin-left:auto"></div>
+      <button class="btn btn-ghost btn-sm" id="squad-export">Export squad CSV</button>
+    </div>
+    <div class="card-head" style="border-top:0">
+      <h2>Squad table</h2>
+      <div class="hint">Click a row to open that swimmer. <strong>Form</strong> is how far this season's best sits behind the all-time PB in their strongest event — near 0% means they are racing at their level right now.</div>
+      <div class="spacer"></div>
+      <span class="small muted" id="squad-count"></span>
+    </div>
+    <div class="card-body flush"><div id="squad-table"></div></div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════════════════
+     SWIMMER  — individual deep dive
+     ══════════════════════════════════════════════════════════════════════ -->
+<section class="panel stack" id="panel-swimmer" role="tabpanel" aria-labelledby="tab-swimmer" hidden>
+  <div class="card">
+    <div class="toolbar">
+      <div class="field">
+        <label for="sw-select">Swimmer</label>
+        <select id="sw-select" style="min-width:230px"></select>
+      </div>
+      <div class="field">
+        <label for="sw-event">Event for progression</label>
+        <select id="sw-event" style="min-width:200px"></select>
+      </div>
+      <div class="spacer" style="margin-left:auto"></div>
+      <button class="btn btn-ghost btn-sm" id="sw-export">Export this swimmer</button>
+    </div>
+    <div class="card-body"><div class="stats" id="sw-stats"></div></div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">
+      <h2>Personal best progression</h2>
+      <div class="hint">Every race at its actual meet date. The amber stepped line is the personal best — it holds flat until it is broken, which is what a PB genuinely does. Triangles mark new bests. Faster times sit higher.</div>
+    </div>
+    <div class="card-body"><div class="chart-wrap"><canvas id="chart-progression"></canvas></div></div>
+  </div>
+
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-head">
+        <h2>How far off their best</h2>
+        <div class="hint">Seconds between this season's best and the all-time PB, per event. Green = at their personal best. The longest bars are the events with the most to claw back.</div>
+      </div>
+      <div class="card-body"><div class="chart-wrap"><canvas id="chart-formgap"></canvas></div></div>
+    </div>
+    <div class="card">
+      <div class="card-head">
+        <h2>Event portfolio</h2>
+        <div class="hint">The one place points earn their keep: ranking a swimmer's own events against each other. A 1:18 breaststroke can be a better swim than a 1:00 freestyle, and raw times cannot tell you that. Hover any bar for the actual time.</div>
+      </div>
+      <div class="card-body"><div class="chart-wrap"><canvas id="chart-portfolio"></canvas></div></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">
+      <h2>Race consistency</h2>
+      <div class="hint">How far off their standing PB each swim landed. A tight band near 0% is a reliable racer; a wide scatter means performances swing meet to meet.</div>
+    </div>
+    <div class="card-body"><div class="chart-wrap short"><canvas id="chart-consistency"></canvas></div></div>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><h2>Best times by event</h2><div class="spacer"></div><span class="small muted" id="sw-events-count"></span></div>
+    <div class="card-body flush">
+      <div class="table-scroll">
+        <table>
+          <thead><tr>
+            <th>Event</th><th class="num">PB</th><th class="num">Points</th>
+            <th>PB date</th><th class="num">Season best</th><th class="num">Gap to PB</th>
+            <th class="num">Races</th><th class="num">Improvement</th>
+          </tr></thead>
+          <tbody id="sw-events-body"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════════════════
+     EVENTS  — rankings and head-to-head
+     ══════════════════════════════════════════════════════════════════════ -->
+<section class="panel stack" id="panel-events" role="tabpanel" aria-labelledby="tab-events" hidden>
+  <div class="card">
+    <div class="toolbar">
+      <div class="field">
+        <label for="ev-select">Event</label>
+        <select id="ev-select" style="min-width:230px"></select>
+      </div>
+      <div class="field">
+        <label for="ev-gender">Gender</label>
+        <select id="ev-gender">
+          <option value="all">All</option>
+          <option value="F">Female</option>
+          <option value="M">Male</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="ev-age">Age group</label>
+        <select id="ev-age"><option value="all">All ages</option></select>
+      </div>
+      <div class="field">
+        <label for="ev-metric">Rank by</label>
+        <div class="seg" id="ev-metric" role="group" aria-label="Rank by">
+          <button type="button" data-metric="seconds" aria-pressed="true">Time</button>
+          <button type="button" data-metric="points" aria-pressed="false">Points</button>
+        </div>
+      </div>
+      <div class="spacer" style="margin-left:auto"></div>
+      <button class="btn btn-ghost btn-sm" id="ev-export">Export rankings</button>
+    </div>
+    <div class="card-head" style="border-top:0">
+      <h2 id="ev-title">Event rankings</h2>
+      <div class="hint">Filter by age group before comparing — ranking a 12&nbsp;y/o against a 17&nbsp;y/o on raw time tells you nothing useful. The amber marker is the fastest in the filtered field. Ranking by <strong>Time</strong> draws a dot plot (no misleading bar lengths); ranking by <strong>Points</strong> draws bars, because points have a true zero.</div>
+    </div>
+    <div class="card-body"><div class="chart-wrap tall"><canvas id="chart-ranking"></canvas></div></div>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><h2>Rankings table</h2><div class="spacer"></div><span class="small muted" id="ev-count"></span></div>
+    <div class="card-body flush">
+      <div class="table-scroll">
+        <table>
+          <thead><tr>
+            <th class="num">#</th><th>Swimmer</th><th>Club</th><th></th>
+            <th class="num">PB</th><th class="num">Points</th><th>Date</th>
+            <th class="num">Behind</th><th class="num">Races</th>
+          </tr></thead>
+          <tbody id="ev-body"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">
+      <h2>Season-by-season comparison</h2>
+      <div class="hint">Pick a few swimmers to follow across seasons. Capped at 8 on purpose — more overlapping lines than that is a texture, not a chart.</div>
+      <div class="spacer"></div>
+      <div class="field">
+        <label for="cmp-metric">Metric</label>
+        <select id="cmp-metric">
+          <option value="points">Points</option>
+          <option value="seconds">Time</option>
+        </select>
+      </div>
+    </div>
+    <div class="card-body">
+      <div class="grid-2">
+        <div class="picker">
+          <div class="picker-chips" id="cmp-chips"></div>
+          <input type="search" id="cmp-search" placeholder="Find a swimmer to add…" autocomplete="off">
+          <div class="picker-list" id="cmp-list"></div>
+        </div>
+        <div class="chart-wrap"><canvas id="chart-comparison"></canvas></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════════════════
+     COVERAGE  — swimmers x events heatmap
+     ══════════════════════════════════════════════════════════════════════ -->
+<section class="panel stack" id="panel-coverage" role="tabpanel" aria-labelledby="tab-coverage" hidden>
+  <div class="card">
+    <div class="toolbar">
+      <div class="field">
+        <label for="cov-course">Course</label>
+        <select id="cov-course">
+          <option value="LC">Long course</option>
+          <option value="SC">Short course</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="cov-gender">Gender</label>
+        <select id="cov-gender">
+          <option value="all">All</option>
+          <option value="F">Female</option>
+          <option value="M">Male</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="cov-search">Search</label>
+        <input type="search" id="cov-search" placeholder="Swimmer…" autocomplete="off">
+      </div>
+      <div class="spacer" style="margin-left:auto"></div>
+      <div class="legend">
+        <span>Weaker</span>
+        <span class="swatches" id="cov-legend"></span>
+        <span>Stronger</span>
+      </div>
+    </div>
+    <div class="card-head" style="border-top:0">
+      <h2>Event coverage</h2>
+      <div class="hint">Each cell is a swimmer's personal best time in that event. Colour shows relative strength, so you can scan across events as well as down them. <strong>The empty cells are the point</strong> — they show who has never raced an event, which is where relay gaps and untried talent hide.</div>
+      <div class="spacer"></div>
+      <span class="small muted" id="cov-count"></span>
+    </div>
+    <div class="card-body flush">
+      <div class="heat-scroll"><table class="heat" id="cov-table"></table></div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════════════════
+     RESULTS  — every race, virtualised
+     ══════════════════════════════════════════════════════════════════════ -->
+<section class="panel stack" id="panel-results" role="tabpanel" aria-labelledby="tab-results" hidden>
+  <div class="card">
+    <div class="toolbar">
+      <div class="field">
+        <label for="res-search">Search</label>
+        <input type="search" id="res-search" placeholder="Swimmer, meet or club…" autocomplete="off">
+      </div>
+      <div class="field">
+        <label for="res-stroke">Stroke</label>
+        <select id="res-stroke"><option value="all">All strokes</option></select>
+      </div>
+      <div class="field">
+        <label for="res-distance">Distance</label>
+        <select id="res-distance"><option value="all">All</option></select>
+      </div>
+      <div class="field">
+        <label for="res-course">Course</label>
+        <select id="res-course">
+          <option value="all">LC + SC</option>
+          <option value="LC">Long course</option>
+          <option value="SC">Short course</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="res-gender">Gender</label>
+        <select id="res-gender">
+          <option value="all">All</option>
+          <option value="F">Female</option>
+          <option value="M">Male</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="res-season">Season</label>
+        <select id="res-season"><option value="all">All seasons</option></select>
+      </div>
+      <div class="field">
+        <label for="res-show">Show</label>
+        <select id="res-show">
+          <option value="all">All races</option>
+          <option value="pb">Personal bests only</option>
+        </select>
+      </div>
+      <div class="spacer" style="margin-left:auto"></div>
+      <button class="btn btn-ghost btn-sm" id="res-export">Export filtered</button>
+    </div>
+    <div class="card-head" style="border-top:0">
+      <h2>All results</h2>
+      <div class="hint">Sorted and filtered in the browser. Only the visible rows exist in the page, so this stays fast with tens of thousands of races.</div>
+      <div class="spacer"></div>
+      <span class="small muted" id="res-count"></span>
+    </div>
+    <div class="card-body flush"><div id="res-table"></div></div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════════════════
+     DATA  — import, roster, settings
+     ══════════════════════════════════════════════════════════════════════ -->
+<section class="panel stack" id="panel-data" role="tabpanel" aria-labelledby="tab-data">
+
+  <div class="card" id="import-card">
+    <div class="card-head">
+      <h2>Load results</h2>
+      <div class="hint">Everything happens in this browser. No account, no upload, no server — your squad's data never leaves this machine.</div>
+    </div>
+    <div class="card-body">
+      <div class="dropzone" id="dropzone">
+        <h3>Drop a results CSV here</h3>
+        <p>or choose a file. You can drop several at once — they are merged, and repeat imports of the same race are ignored rather than duplicated.</p>
+        <input type="file" id="file-input" accept=".csv,text/csv" multiple hidden>
+        <button class="btn btn-primary" id="choose-file">Choose CSV file</button>
+        <button class="btn btn-ghost" id="load-sample">Load sample data</button>
+      </div>
+      <div id="import-report" class="stack" style="margin-top:14px"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">
+      <h2>Settings</h2>
+      <div class="hint">Stored in this browser alongside your results.</div>
+    </div>
+    <div class="card-body">
+      <div class="toolbar" style="background:transparent;border:0;padding:0">
+        <div class="field">
+          <label for="set-season-start">Season starts in</label>
+          <select id="set-season-start">
+            <option value="1">January (calendar year)</option>
+            <option value="7">July</option>
+            <option value="9">September</option>
+            <option value="10">October</option>
+          </select>
+        </div>
+        <div class="field" style="justify-content:flex-end">
+          <span class="small muted">Changes how “season best” is grouped.</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" id="roster-card" hidden>
+    <div class="card-head">
+      <h2>Missing genders</h2>
+      <div class="hint">
+        World Aquatics points are scored against the world record for the swimmer's gender, so a swimmer with no gender set cannot be scored and will be
+        missing from every points chart. Set them here — it is saved with your data.
+      </div>
+      <div class="spacer"></div>
+      <button class="btn btn-ghost btn-sm" id="roster-apply">Apply</button>
+    </div>
+    <div class="card-body flush">
+      <div class="table-scroll" style="max-height:340px">
+        <table><thead><tr><th>Swimmer</th><th>Club</th><th class="num">Races</th><th>Gender</th></tr></thead>
+        <tbody id="roster-body"></tbody></table>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><h2>Your data</h2></div>
+    <div class="card-body stack">
+      <div id="storage-status"></div>
+      <div class="toolbar" style="background:transparent;border:0;padding:0">
+        <button class="btn btn-ghost btn-sm" id="export-all">Export everything as CSV</button>
+        <button class="btn btn-danger btn-sm" id="clear-all">Delete all data</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><h2>How the numbers are worked out</h2></div>
+    <div class="card-body stack small">
+      <p><strong>World Aquatics points</strong> (still widely called FINA points) score every swim against the world record for that gender, course and event:
+      <code>points = 1000 × (world record ÷ your time)³</code>. The base time is worth 1000. It is the only fair way to compare a 12&nbsp;y/o's 50 Free with a 17&nbsp;y/o's 400 IM, which is exactly what you need across a 150-swimmer squad.
+      <span class="muted" id="base-version"></span></p>
+      <p><strong>Personal best</strong> is the fastest time ever recorded in that exact course, distance and stroke. A long-course 100 Free and a short-course 100 Free are separate PBs, because they are separate events.</p>
+      <p><strong>Season best</strong> is the fastest time in the current season, grouped by the season start month set above.</p>
+      <p><strong>Form</strong> is the gap between the two. Coaches watch this more than any single time: a season best closing in on the personal best means the swimmer is coming into form.</p>
+      <p class="muted">Base times follow the published World Aquatics table. Records move, so the numbers live in one editable table in <code>src/points.js</code>. Changing a base time rescales everyone in that event by the same factor, so rankings within an event never shift.</p>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<div id="toast" role="status" aria-live="polite"></div>
+<div id="busy" hidden>
+  <div class="busy-card">
+    <strong class="busy-label">Working…</strong>
+    <div class="bar"><i></i></div>
+  </div>
+</div>
+
+<script src="src/points.js"></script>
+<script src="src/data.js"></script>
+<script src="src/store.js"></script>
+<script src="src/ui.js"></script>
+<script src="src/charts.js"></script>
+<script src="src/app.js"></script>
+</body>
+</html>

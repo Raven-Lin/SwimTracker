@@ -1,62 +1,22 @@
 {
   "name": "swimtracker",
-  "version": "1.0.0",
-  "description": "Swimming results dashboard for coaches",
-  "main": "main.js",
+  "version": "2.0.0",
+  "description": "Offline squad analytics for swim coaches. A static page — no server, no install.",
   "author": "Joanne Lou",
   "license": "UNLICENSED",
   "private": true,
+  "type": "commonjs",
   "scripts": {
-    "start": "electron .",
-    "build:mac": "electron-builder --mac",
-    "build:win": "electron-builder --win",
-    "build:all": "electron-builder --mac --win"
-  },
-  "build": {
-    "appId": "com.swimtracker.app",
-    "productName": "SwimTracker",
-    "copyright": "Copyright 2026 Joanne Lou",
-    "files": [
-      "main.js",
-      "server.py",
-      "swim_coach_dashboard.html",
-      "swimmer_results.csv"
-    ],
-    "extraResources": [
-      {
-        "from": "server.py",
-        "to": "server.py"
-      },
-      {
-        "from": "swim_coach_dashboard.html",
-        "to": "swim_coach_dashboard.html"
-      }
-    ],
-    "mac": {
-      "category": "public.app-category.sports",
-      "icon": "icon.icns",
-      "target": [
-        {
-          "target": "dmg",
-          "arch": ["arm64", "x64"]
-        }
-      ]
-    },
-    "win": {
-      "target": [
-        {
-          "target": "nsis",
-          "arch": ["x64"]
-        }
-      ]
-    },
-    "nsis": {
-      "oneClick": false,
-      "allowToChangeInstallationDirectory": true
-    }
+    "test": "npm run test:unit && npm run test:py && npm run test:e2e",
+    "test:unit": "node --test tests/unit.test.mjs",
+    "test:e2e": "node --test tests/e2e.test.mjs",
+    "test:py": "python3 -m unittest discover -s tests -p \"test_*.py\"",
+    "fixture": "node tools/make-fixture.mjs 150 tests/fixtures/squad-150.csv",
+    "sample": "node tools/make-sample-js.mjs",
+    "screenshots": "node tools/screenshot.mjs http",
+    "serve": "node tools/serve.mjs"
   },
   "devDependencies": {
-    "electron": "^25.9.0",
-    "electron-builder": "^24.0.0"
+    "playwright": "^1.49.1"
   }
 }
