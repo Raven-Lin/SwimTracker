@@ -75,6 +75,15 @@
 *, *::before, *::after { box-sizing: border-box; }
 * { margin: 0; padding: 0; }
 
+/* The `hidden` attribute is only `display:none` in the UA stylesheet, so ANY
+   author `display` on the element beats it. That had already been patched
+   one selector at a time (.panel[hidden], #busy[hidden], .meta[hidden]) and
+   it caught us again: #entry-error is a .notice, .notice sets display, and an
+   empty amber bar sat permanently under the entry form. One global rule ends
+   the whole class of bug -- !important because it must outrank the component
+   rule it is there to override. */
+[hidden] { display: none !important; }
+
 html { -webkit-text-size-adjust: 100%; }
 
 body {
@@ -162,7 +171,6 @@ header.app-bar {
    LAYOUT
    ══════════════════════════════════════════════════════════════════════════ */
 main { max-width: 1560px; margin: 0 auto; padding: 20px; }
-.panel[hidden] { display: none; }
 .stack { display: flex; flex-direction: column; gap: 16px; }
 
 .card {
@@ -226,7 +234,7 @@ main { max-width: 1560px; margin: 0 auto; padding: 20px; }
   font-size: .7rem; text-transform: uppercase; letter-spacing: .06em;
   color: var(--grey-500); font-weight: 650;
 }
-select, input[type="text"], input[type="search"], input[type="number"] {
+select, input[type="text"], input[type="search"], input[type="number"], input[type="date"] {
   font: inherit; font-size: .86rem;
   padding: 7px 10px;
   border: 1px solid var(--grey-300); border-radius: var(--radius-sm);
@@ -235,6 +243,24 @@ select, input[type="text"], input[type="search"], input[type="number"] {
 }
 select:hover, input:hover { border-color: var(--grey-500); }
 input[type="search"] { min-width: 190px; }
+/* A field the form rejected. Colour alone would fail for a colour-blind user,
+   so the message in #entry-error always names the field too. */
+.field > input.invalid, .field > select.invalid {
+  border-color: var(--red); background: var(--red-100);
+}
+
+/* Manual entry. Auto-fit rather than a fixed column count: the same markup
+   gives four columns on a laptop and one on a phone at poolside, which is
+   where this form will actually get used. */
+.entry-grid {
+  display: grid; gap: 12px 14px;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+}
+.entry-grid .field > input, .entry-grid .field > select { width: 100%; }
+@media (max-width: 560px) {
+  /* The span-2 fields would otherwise leave a stranded half-row. */
+  .entry-grid > .field { grid-column: span 1 !important; }
+}
 
 .btn {
   appearance: none; font: inherit; font-size: .84rem; font-weight: 600;
@@ -252,6 +278,15 @@ input[type="search"] { min-width: 190px; }
 .btn-danger { background: var(--white); border-color: var(--red); color: var(--red); }
 .btn-danger:hover:not(:disabled) { background: var(--red); color: #fff; }
 .btn-sm { padding: 5px 10px; font-size: .78rem; }
+
+/* Download buttons. These were plain ghost buttons and went unnoticed -- a
+   coach asked where the CSV export was while looking at a screen with five of
+   them on it. The arrow and the tinted face make them read as "this gives you
+   a file" without needing a legend, and the tint is the accent at 100 so it
+   still clears contrast for the accent-700 text. */
+.btn-dl { background: var(--accent-100); border-color: var(--accent-400); color: var(--accent-700); }
+.btn-dl:hover:not(:disabled) { background: var(--accent-400); border-color: var(--accent-700); color: #fff; }
+.btn-dl::before { content: "\2193"; font-weight: 700; }
 
 .seg { display: inline-flex; border: 1px solid var(--grey-300); border-radius: var(--radius-sm); overflow: hidden; }
 .seg button {
@@ -466,7 +501,6 @@ td.num, th.num { text-align: right; }
   display: grid; place-items: center; z-index: 150;
   backdrop-filter: blur(2px);
 }
-#busy[hidden] { display: none; }
 .busy-card {
   background: #fff; border-radius: var(--radius); padding: 26px 34px;
   box-shadow: var(--shadow-lg); text-align: center; min-width: 260px;
@@ -517,4 +551,3 @@ td.num, th.num { text-align: right; }
   font-size: .7rem; text-transform: uppercase; letter-spacing: .06em;
   color: rgba(255,255,255,.6); font-weight: 650;
 }
-.app-bar .meta[hidden] { display: none; }

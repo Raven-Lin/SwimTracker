@@ -660,3 +660,182 @@ test('the generated sample script matches the sample CSV exactly', async () => {
   assert.equal(sandbox.__SWIMTRACKER_SAMPLE__, csv,
     'assets/sample-squad.js is stale — run `node tools/make-sample-js.mjs`');
 });
+
+/* ============================================================================
+   Manual entry
+
+   Added because a CSV used to be the only way data could get in, which made
+   the app unusable at the one moment it matters most: poolside with a
+   stopwatch. These tests pin the behaviour that makes the form usable for a
+   whole heat rather than one race.
+============================================================================ */
+
+/**
+ * Fill the entry form. Only the keys passed are touched.
+ *
+ * Opens the Data tab first: earlier tests leave the page on whichever tab they
+ * were checking, and a hidden input cannot be filled.
+ */
+async function fillEntry(fields) {
+  await page.click('#tab-data');
+  await page.waitForFunction(
+    () => !document.getElementById('panel-data')?.hasAttribute('hidden'), { timeout: 15000 });
+  for (const [id, value] of Object.entries(fields)) {
+    const sel = '#entry-' + id;
+    if (await page.$eval(sel, el => el.tagName) === 'SELECT') {
+      await page.selectOption(sel, value);
+    } else {
+      await page.fill(sel, value);
+    }
+  }
+}
+
+async function saveEntry() {
+  await page.click('#entry-save');
+  await page.waitForFunction(
+    () => document.getElementById('busy')?.hasAttribute('hidden'), { timeout: 15000 });
+}
+
+test('a hand-typed time reaches the dataset and becomes a PB', async () => {
+  const before = await page.evaluate(
+    () => window.__swimtracker.state.dataset?.races.length ?? 0);
+
+  await fillEntry({
+    name: 'Hand Typed', time: '1:05.40', date: '2026-02-01',
+    course: 'LC', distance: '100', stroke: 'Freestyle', gender: 'F',
+    meet: 'Club Night', club: 'Testers', age: '14'
+  });
+  await saveEntry();
+
+  const after = await page.evaluate(() => {
+    const sw = window.__swimtracker.state.dataset.swimmers.get('Hand Typed');
+    const ev = sw && sw.events.get('LC|100|Freestyle');
+    return {
+      races: window.__swimtracker.state.dataset.races.length,
+      pb: ev && ev.pb.time,
+      club: sw && sw.club,
+      gender: sw && sw.gender,
+      meet: ev && ev.pb.meet
+    };
+  });
+
+  assert.equal(after.races, before + 1, 'exactly one race added');
+  assert.equal(after.pb, '1:05.40');
+  assert.equal(after.club, 'Testers');
+  assert.equal(after.gender, 'F');
+  assert.equal(after.meet, 'Club Night');
+});
+
+test('saving keeps the swimmer and event but clears the time', async () => {
+  // This is what makes typing a heat quick: name once, then time after time.
+  await page.click('#tab-data');
+  assert.equal(await page.inputValue('#entry-time'), '');
+  assert.equal(await page.inputValue('#entry-name'), 'Hand Typed');
+  assert.equal(await page.inputValue('#entry-meet'), 'Club Night');
+  assert.equal(await page.inputValue('#entry-distance'), '100');
+});
+
+test('the same race typed twice is not duplicated', async () => {
+  const before = await page.evaluate(
+    () => window.__swimtracker.state.dataset.races.length);
+
+  await fillEntry({ time: '1:05.40' });
+  await saveEntry();
+
+  const after = await page.evaluate(
+    () => window.__swimtracker.state.dataset.races.length);
+  assert.equal(after, before, 'dedupe swallowed the repeat');
+  assert.match(await page.textContent('#toast'), /already recorded/);
+});
+
+test('an unreadable time is rejected and nothing is written', async () => {
+  const before = await page.evaluate(
+    () => window.__swimtracker.state.dataset.races.length);
+
+  await fillEntry({ time: 'half past three' });
+  await page.click('#entry-save');
+
+  assert.match(await page.textContent('#entry-error'), /not readable/);
+  assert.equal(await page.getAttribute('#entry-time', 'class'), 'invalid');
+  assert.equal(
+    await page.evaluate(() => window.__swimtracker.state.dataset.races.length),
+    before, 'no row written for a bad time');
+});
+
+test('a date in the future is rejected', async () => {
+  // Almost always a mistyped year, and it would land outside the current
+  // season and quietly vanish from every season-scoped view.
+  await fillEntry({ time: '30.00', date: '2099-01-01' });
+  await page.click('#entry-save');
+  assert.match(await page.textContent('#entry-error'), /future/);
+});
+
+test('an empty swimmer name is rejected', async () => {
+  await fillEntry({ name: '', date: '2026-02-02', time: '30.00' });
+  await page.click('#entry-save');
+  assert.match(await page.textContent('#entry-error'), /name/i);
+});
+
+test('existing swimmers are offered as autocomplete so names do not fork', async () => {
+  await page.click('#tab-data');
+  const names = await page.$$eval('#entry-names option', o => o.map(x => x.value));
+  assert.ok(names.includes('Hand Typed'), 'typed swimmer is in the datalist');
+  assert.ok(names.length > 100, `datalist carries the whole squad (${names.length})`);
+});
+
+test('a hand-typed swimmer survives a reload', async () => {
+  // The form writes through the same persistence path as an import, so the
+  // race must still be there on the next visit.
+  await page.reload({ waitUntil: 'networkidle' });
+  await page.waitForFunction(
+    () => window.__swimtracker?.state?.dataset?.swimmers?.size > 0, { timeout: 30000 });
+  const found = await page.evaluate(
+    () => !!window.__swimtracker.state.dataset.swimmers.get('Hand Typed'));
+  assert.ok(found, 'hand-typed race persisted');
+});
+
+test('times off the personal best are shown in seconds, never percent', async () => {
+  // Both tables used to print a percentage, which needs mental arithmetic
+  // against a time nobody has memorised and flatters sprinters over distance
+  // swimmers: 1% of a 50 is half a second, 1% of a 1500 is eleven.
+  await page.click('#tab-squad');
+  await page.waitForFunction(
+    () => document.querySelector('#squad-table')?.textContent.length > 50,
+    { timeout: 15000 });
+
+  const squadText = await page.textContent('#squad-table');
+  assert.match(squadText, /Off PB/, 'the column is there');
+  assert.doesNotMatch(squadText, /\d\s*%/, 'no percentages in the squad table');
+  // At least one row must actually show a seconds gap, or the assertion above
+  // would pass on an empty column.
+  // Assert the format only where the data actually has a gap to show. The
+  // fixture's seasons and the hand-typed 2026 races need not overlap, and an
+  // all-dashes column would otherwise pass the no-percent check vacuously.
+  const gapRows = await page.evaluate(() =>
+    window.__swimtracker.state.dataset
+      ? window.__swimtracker.data.squadSummary(window.__swimtracker.state.dataset, {})
+          .filter(r => r.formGapSec !== null).length
+      : 0);
+  if (gapRows > 0) {
+    await page.fill('#squad-search', '');
+    await page.waitForTimeout(250);
+    const withGaps = await page.evaluate(() => {
+      const rows = window.__swimtracker.data.squadSummary(
+        window.__swimtracker.state.dataset, {}).filter(r => r.formGapSec !== null);
+      return rows.map(r => r.name);
+    });
+    await page.fill('#squad-search', withGaps[0]);
+    await page.waitForTimeout(300);
+    const text = await page.textContent('#squad-table');
+    assert.match(text, /(\+\d+\.\d{2}s|At PB)/,
+      `gap for ${withGaps[0]} is printed in seconds`);
+    assert.doesNotMatch(text, /\d\s*%/, 'still no percentages');
+    await page.fill('#squad-search', '');
+  }
+
+  await page.click('#tab-swimmer');
+  await page.waitForFunction(
+    () => document.querySelectorAll('#sw-events-body tr').length > 0, { timeout: 15000 });
+  const swText = await page.textContent('#sw-events-body');
+  assert.doesNotMatch(swText, /\d\s*%/, 'no percentages in the swimmer event table');
+});

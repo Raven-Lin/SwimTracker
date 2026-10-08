@@ -108,11 +108,11 @@
         <select id="squad-age"><option value="all">All ages</option></select>
       </div>
       <div class="spacer" style="margin-left:auto"></div>
-      <button class="btn btn-ghost btn-sm" id="squad-export">Export squad CSV</button>
+      <button class="btn btn-dl btn-sm" id="squad-export">Download squad CSV</button>
     </div>
     <div class="card-head" style="border-top:0">
       <h2>Squad table</h2>
-      <div class="hint">Click a row to open that swimmer. <strong>Form</strong> is how far this season's best sits behind the all-time PB in their strongest event — near 0% means they are racing at their level right now.</div>
+      <div class="hint">Click a row to open that swimmer. <strong>Off PB</strong> is how many seconds this season's best sits behind the all-time PB in their strongest event — at or near zero means they are racing at their level right now.</div>
       <div class="spacer"></div>
       <span class="small muted" id="squad-count"></span>
     </div>
@@ -135,7 +135,7 @@
         <select id="sw-event" style="min-width:200px"></select>
       </div>
       <div class="spacer" style="margin-left:auto"></div>
-      <button class="btn btn-ghost btn-sm" id="sw-export">Export this swimmer</button>
+      <button class="btn btn-dl btn-sm" id="sw-export">Download this swimmer</button>
     </div>
     <div class="card-body"><div class="stats" id="sw-stats"></div></div>
   </div>
@@ -168,7 +168,7 @@
   <div class="card">
     <div class="card-head">
       <h2>Race consistency</h2>
-      <div class="hint">How far off their standing PB each swim landed. A tight band near 0% is a reliable racer; a wide scatter means performances swing meet to meet.</div>
+      <div class="hint">How many seconds off their standing PB each swim landed. A tight band near zero is a reliable racer; a wide scatter means performances swing meet to meet. Pick an event above to compare like with like — seconds off a 50 and off a 400 do not mean the same thing.</div>
     </div>
     <div class="card-body"><div class="chart-wrap short"><canvas id="chart-consistency"></canvas></div></div>
   </div>
@@ -181,7 +181,7 @@
           <thead><tr>
             <th>Event</th><th class="num">PB</th><th class="num">Points</th>
             <th>PB date</th><th class="num">Season best</th><th class="num">Gap to PB</th>
-            <th class="num">Races</th><th class="num">Improvement</th>
+            <th class="num">Races</th><th class="num">Time dropped</th>
           </tr></thead>
           <tbody id="sw-events-body"></tbody>
         </table>
@@ -220,7 +220,7 @@
         </div>
       </div>
       <div class="spacer" style="margin-left:auto"></div>
-      <button class="btn btn-ghost btn-sm" id="ev-export">Export rankings</button>
+      <button class="btn btn-dl btn-sm" id="ev-export">Download rankings</button>
     </div>
     <div class="card-head" style="border-top:0">
       <h2 id="ev-title">Event rankings</h2>
@@ -361,7 +361,7 @@
         </select>
       </div>
       <div class="spacer" style="margin-left:auto"></div>
-      <button class="btn btn-ghost btn-sm" id="res-export">Export filtered</button>
+      <button class="btn btn-dl btn-sm" id="res-export">Download these races</button>
     </div>
     <div class="card-head" style="border-top:0">
       <h2>All results</h2>
@@ -392,6 +392,83 @@
         <button class="btn btn-ghost" id="load-sample">Load sample data</button>
       </div>
       <div id="import-report" class="stack" style="margin-top:14px"></div>
+    </div>
+  </div>
+
+  <!-- Typing times in by hand. Until now the only way data could get in was a
+       CSV, which is useless at the poolside: a coach watching heats has a
+       stopwatch and a name, not a spreadsheet. The form keeps the swimmer,
+       meet, date and event sticky after each save and clears only the time,
+       so entering a whole heat is name-once-then-time-time-time. -->
+  <div class="card" id="entry-card">
+    <div class="card-head">
+      <h2>Add a time by hand</h2>
+      <div class="hint">For poolside, or for a race that never made it into a results file. The swimmer, meet, date and event stay put after each save, so you can type one heat straight down the list.</div>
+    </div>
+    <div class="card-body stack">
+      <div class="entry-grid">
+        <div class="field" style="grid-column: span 2">
+          <label for="entry-name">Swimmer</label>
+          <input type="text" id="entry-name" list="entry-names" autocomplete="off" placeholder="Surname, First or First Surname">
+          <datalist id="entry-names"></datalist>
+        </div>
+        <div class="field">
+          <label for="entry-time">Time</label>
+          <input type="text" id="entry-time" inputmode="decimal" autocomplete="off" placeholder="29.30 or 1:18.14">
+        </div>
+        <div class="field">
+          <label for="entry-date">Date</label>
+          <input type="date" id="entry-date">
+        </div>
+        <div class="field">
+          <label for="entry-course">Course</label>
+          <select id="entry-course">
+            <option value="SC">SC (25m pool)</option>
+            <option value="LC">LC (50m pool)</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="entry-distance">Distance</label>
+          <select id="entry-distance">
+            <option>50</option><option>100</option><option>200</option>
+            <option>400</option><option>800</option><option>1500</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="entry-stroke">Stroke</label>
+          <select id="entry-stroke">
+            <option>Freestyle</option><option>Backstroke</option>
+            <option>Breaststroke</option><option>Butterfly</option><option>Medley</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="entry-gender">Gender</label>
+          <select id="entry-gender">
+            <option value="">Unknown</option>
+            <option value="F">Female</option>
+            <option value="M">Male</option>
+          </select>
+        </div>
+        <div class="field" style="grid-column: span 2">
+          <label for="entry-meet">Meet <span class="muted">(optional)</span></label>
+          <input type="text" id="entry-meet" autocomplete="off" placeholder="Club Night, State Age…">
+        </div>
+        <div class="field">
+          <label for="entry-club">Club <span class="muted">(optional)</span></label>
+          <input type="text" id="entry-club" autocomplete="off">
+        </div>
+        <div class="field">
+          <label for="entry-age">Age group <span class="muted">(optional)</span></label>
+          <input type="text" id="entry-age" autocomplete="off" placeholder="13, 13-14…">
+        </div>
+      </div>
+      <div id="entry-error" class="notice notice-warn" hidden></div>
+      <div class="toolbar" style="background:transparent;border:0;padding:0">
+        <button class="btn btn-primary" id="entry-save">Save time</button>
+        <button class="btn btn-ghost btn-sm" id="entry-clear">Clear the form</button>
+        <span class="small muted" id="entry-preview"></span>
+      </div>
+      <div id="entry-recent" class="small muted"></div>
     </div>
   </div>
 
@@ -437,11 +514,14 @@
   </div>
 
   <div class="card">
-    <div class="card-head"><h2>Your data</h2></div>
+    <div class="card-head">
+      <h2>Your data</h2>
+      <div class="hint">This downloads every race you have loaded, as one CSV you can open in Excel. Each tab also has its own download button for just what is on screen — squad, one swimmer, rankings, or the filtered race list.</div>
+    </div>
     <div class="card-body stack">
       <div id="storage-status"></div>
       <div class="toolbar" style="background:transparent;border:0;padding:0">
-        <button class="btn btn-ghost btn-sm" id="export-all">Export everything as CSV</button>
+        <button class="btn btn-dl" id="export-all">Download everything as CSV</button>
         <button class="btn btn-danger btn-sm" id="clear-all">Delete all data</button>
       </div>
     </div>
@@ -455,7 +535,7 @@
       <span class="muted" id="base-version"></span></p>
       <p><strong>Personal best</strong> is the fastest time ever recorded in that exact course, distance and stroke. A long-course 100 Free and a short-course 100 Free are separate PBs, because they are separate events.</p>
       <p><strong>Season best</strong> is the fastest time in the current season, grouped by the season start month set above.</p>
-      <p><strong>Form</strong> is the gap between the two. Coaches watch this more than any single time: a season best closing in on the personal best means the swimmer is coming into form.</p>
+      <p><strong>Off PB</strong> is the gap between the two, in seconds. Coaches watch this more than any single time: a season best closing in on the personal best means the swimmer is coming into form. It is shown in seconds rather than as a percentage because seconds is what you can set a target against — though the colour still uses the proportion, since 0.8s off a 50 is a worry and 0.8s off a 400 is not.</p>
       <p class="muted">Base times follow the published World Aquatics table. Records move, so the numbers live in one editable table in <code>src/points.js</code>. Changing a base time rescales everyone in that event by the same factor, so rankings within an event never shift.</p>
     </div>
   </div>

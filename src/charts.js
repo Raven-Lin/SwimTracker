@@ -351,7 +351,7 @@
                   ` Personal best: ${D.secondsToTime(r.ev.pb.seconds)}`,
                   r.gapSec <= 0.005
                     ? ' At their personal best'
-                    : ` ${r.gapSec.toFixed(2)}s off (${r.gapPct.toFixed(1)}%)`
+                    : ` ${r.gapSec.toFixed(2)}s off their PB`
                 ];
               }
             }
@@ -770,29 +770,37 @@
      ========================================================================== */
 
   /**
-   * Every race for one swimmer plotted as "percent off their PB at the time",
-   * against date. A tight band near 0% is a reliable racer; a wide scatter
+   * Every race for one swimmer plotted as "seconds off their PB at the time",
+   * against date. A tight band near 0 is a reliable racer; a wide scatter
    * means the swimmer is inconsistent under pressure — a training signal that
    * raw times hide completely, because raw times mix event and improvement
    * into the same number.
+   *
+   * The axis is seconds, not percent, because seconds is what a coach can act
+   * on: "she is landing 1.5s off her PB" sets the week's target, "3.1% off"
+   * does not. The cost is that one seconds axis cannot fairly hold a 50 and a
+   * 400 at once — 1.5s off a 50 is a bad swim, off a 400 it is a good one —
+   * so the event selector above the progression chart filters this one too,
+   * and the axis title says so when it is showing everything.
    */
   function consistency(canvasId, swimmer, opts) {
     const settings = opts || {};
+    const oneEvent = !!(settings.eventKey && settings.eventKey !== 'all');
     const series = new Map();
 
     swimmer.events.forEach(ev => {
-      if (settings.eventKey && settings.eventKey !== 'all' && ev.eventKey !== settings.eventKey) return;
+      if (oneEvent && ev.eventKey !== settings.eventKey) return;
       let best = Infinity;
       ev.races.forEach(r => {
         if (!r.date) return;
         // Compare each swim against the PB standing *before* it, so a new PB
-        // shows as 0% rather than being measured against a future best.
+        // shows as 0 rather than being measured against a future best.
         const reference = Math.min(best, r.seconds);
-        const pct = reference > 0 ? ((r.seconds - reference) / reference) * 100 : 0;
+        const off = r.seconds - reference;
         if (r.seconds < best) best = r.seconds;
         const key = ev.stroke;
         if (!series.has(key)) series.set(key, []);
-        series.get(key).push({ x: r.date.getTime(), y: pct, race: r });
+        series.get(key).push({ x: r.date.getTime(), y: off, race: r });
       });
     });
 
@@ -819,8 +827,8 @@
               title: items => fmtDateFull(items[0].parsed.x),
               label: ctx => {
                 const r = ctx.raw.race;
-                const pct = ctx.parsed.y;
-                return ` ${D.secondsToTime(r.seconds)} · ${pct < 0.005 ? 'at PB' : '+' + pct.toFixed(2) + '% off PB'}`;
+                const off = ctx.parsed.y;
+                return ` ${D.secondsToTime(r.seconds)} · ${off < 0.005 ? 'at PB' : '+' + off.toFixed(2) + 's off PB'}`;
               },
               afterLabel: ctx => ` ${ctx.raw.race.course} ${ctx.raw.race.distance} ${ctx.raw.race.stroke}`
             }
@@ -830,9 +838,13 @@
           x: { type: 'linear',
                ticks: { font: FONT, callback: v => fmtDateShort(v), maxRotation: 0, autoSkipPadding: 22 },
                grid: { color: T.gridFaint } },
-          y: { title: { display: true, text: '% off personal best (lower is better)', font: FONT },
+          y: { title: { display: true,
+                         text: oneEvent
+                           ? 'Seconds off personal best (lower is better)'
+                           : 'Seconds off personal best — all events together, so distances are not comparable',
+                         font: FONT },
                beginAtZero: true,
-               ticks: { font: FONT, callback: v => v.toFixed(1) + '%' },
+               ticks: { font: FONT, callback: v => v.toFixed(2) + 's' },
                grid: { color: T.grid } }
         }
       })

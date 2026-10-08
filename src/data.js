@@ -512,8 +512,19 @@
           : null;
 
         // Improvement since the very first recorded swim in this event.
-        ev.improvementPct = ev.firstRace && ev.pb && ev.firstRace.seconds
-          ? ((ev.firstRace.seconds - ev.pb.seconds) / ev.firstRace.seconds) * 100
+        //
+        // Seconds is the headline number and the percentage is kept beside it
+        // only for colour thresholds. A coach thinks in seconds: "she has taken
+        // 4.2s off her 100 Free" is actionable, "she is 6.1% faster" needs
+        // mental arithmetic against a time nobody has memorised. The two are
+        // also not interchangeable across distances -- 1% of a 50 is half a
+        // second, 1% of a 1500 is eleven -- so a percentage column silently
+        // flatters the sprinters and buries the distance swimmers.
+        ev.improvementSec = ev.firstRace && ev.pb
+          ? ev.firstRace.seconds - ev.pb.seconds
+          : null;
+        ev.improvementPct = ev.improvementSec !== null && ev.firstRace.seconds
+          ? (ev.improvementSec / ev.firstRace.seconds) * 100
           : null;
       });
       sw.pbCount = pbCount;
@@ -689,7 +700,8 @@
       // Best points swum *this* season, and the all-time best.
       let seasonPoints = null;
       let seasonRace = null;
-      let inForm = null;
+      let inForm = null;      // percentage — drives the colour threshold only
+      let inFormSec = null;   // seconds — the number actually shown
 
       sw.events.forEach(ev => {
         const entry = ev.bySeason.get(season);
@@ -702,9 +714,18 @@
 
       // Form = how close this season's best in the swimmer's strongest event
       // sits to their all-time PB in that event.
+      //
+      // Both units are carried: seconds is what the column prints, the
+      // percentage only decides whether it reads as good or stale. A fixed
+      // seconds threshold cannot do that job -- 0.8s off a 50 is a worry,
+      // 0.8s off a 400 is nothing -- so the threshold stays proportional
+      // while the number stays concrete.
       if (sw.bestPointsRace) {
         const ev = sw.events.get(sw.bestPointsRace.eventKey);
-        if (ev && ev.sbToPbGapPct !== null) inForm = ev.sbToPbGapPct;
+        if (ev && ev.sbToPbGapPct !== null) {
+          inForm = ev.sbToPbGapPct;
+          inFormSec = ev.sbToPbGapSec;
+        }
       }
 
       out.push({
@@ -719,6 +740,7 @@
         seasonPoints,
         seasonRace,
         formGapPct: inForm,
+        formGapSec: inFormSec,
         lastDate: sw.lastDate,
         swimmer: sw
       });

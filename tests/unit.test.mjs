@@ -217,6 +217,33 @@ test('computes season best, PB gap and improvement', () => {
   assert.equal(ev.seasonBest.seconds, 61);
   assert.ok(Math.abs(ev.sbToPbGapSec - 1) < 1e-9, 'one second off the PB');
   assert.ok(Math.abs(ev.improvementPct - 7.6923) < 0.01, '65s -> 60s is 7.69%');
+
+  // Seconds is the headline unit now. The percentage is kept only to drive a
+  // colour threshold, because a fixed seconds threshold cannot be fair across
+  // distances, but nothing user-facing prints it.
+  assert.ok(Math.abs(ev.improvementSec - 5) < 1e-9, '65s -> 60s is 5.00s dropped');
+});
+
+test('improvement in seconds is zero when the first swim is still the PB', () => {
+  // A swimmer with one race, or whose first race was never beaten, has dropped
+  // nothing. The table must show a dash, so this has to be 0 and not null.
+  const ds = D.buildDataset([
+    row({ time: '1:00.00', race_date: '2025-03-01' }),
+    row({ time: '1:02.00', race_date: '2025-04-01' })
+  ]);
+  const ev = ds.swimmers.get('Jo Swimmer').events.get('LC|100|Freestyle');
+  assert.equal(ev.pb.seconds, 60);
+  assert.equal(ev.improvementSec, 0);
+});
+
+test('the squad summary carries the PB gap in seconds as well as percent', () => {
+  const ds = D.buildDataset([
+    row({ time: '1:00.00', race_date: '2024-03-01' }),
+    row({ time: '1:02.50', race_date: '2025-03-01' })
+  ]);
+  const [r] = D.squadSummary(ds, {});
+  assert.ok(Math.abs(r.formGapSec - 2.5) < 1e-9, 'two and a half seconds off the PB');
+  assert.ok(r.formGapPct > 4 && r.formGapPct < 4.2, 'percent still available for the threshold');
 });
 
 test('honours a non-January season start', () => {

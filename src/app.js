@@ -194,6 +194,186 @@
     document.getElementById('roster-apply').addEventListener('click', applyRoster);
     document.getElementById('export-all').addEventListener('click', exportAll);
     document.getElementById('clear-all').addEventListener('click', clearAll);
+    wireEntry();
+  }
+
+  /* ==========================================================================
+     MANUAL ENTRY
+
+     Before this, a CSV was the only way in, which made the app useless in the
+     one place it is most wanted: on poolside with a stopwatch. Everything here
+     funnels into the same normalizeRow/dedupe/rebuild path the importer uses,
+     so a typed race and an imported race are indistinguishable afterwards and
+     cannot diverge in validation.
+     ========================================================================== */
+
+  const ENTRY_FIELDS = ['name', 'time', 'date', 'course', 'distance', 'stroke',
+                        'gender', 'meet', 'club', 'age'];
+
+  function entryEl(f) { return document.getElementById('entry-' + f); }
+
+  function wireEntry() {
+    document.getElementById('entry-save').addEventListener('click', saveEntry);
+    document.getElementById('entry-clear').addEventListener('click', () => {
+      ENTRY_FIELDS.forEach(f => { entryEl(f).value = ''; });
+      entryEl('course').value = 'SC';
+      entryEl('distance').value = '50';
+      entryEl('stroke').value = 'Freestyle';
+      clearEntryErrors();
+      updateEntryPreview();
+      entryEl('name').focus();
+    });
+
+    // Enter anywhere in the form saves, so a whole heat can be typed without
+    // reaching for the mouse between swims.
+    document.getElementById('entry-card').addEventListener('keydown', e => {
+      if (e.key === 'Enter' && e.target.tagName !== 'BUTTON') { e.preventDefault(); saveEntry(); }
+    });
+
+    ENTRY_FIELDS.forEach(f => {
+      entryEl(f).addEventListener('input', () => {
+        entryEl(f).classList.remove('invalid');
+        updateEntryPreview();
+      });
+    });
+
+    // Default to today: the overwhelmingly common case is entering a race that
+    // just happened.
+    entryEl('date').value = new Date().toISOString().slice(0, 10);
+    updateEntryPreview();
+  }
+
+  function clearEntryErrors() {
+    ENTRY_FIELDS.forEach(f => entryEl(f).classList.remove('invalid'));
+    const box = document.getElementById('entry-error');
+    box.hidden = true;
+    box.textContent = '';
+  }
+
+  function showEntryError(message, fields) {
+    (fields || []).forEach(f => entryEl(f).classList.add('invalid'));
+    const box = document.getElementById('entry-error');
+    box.textContent = message;
+    box.hidden = false;
+  }
+
+  /** Live echo of what will be saved, so a mistyped time is caught before it lands. */
+  function updateEntryPreview() {
+    const seconds = D.timeToSeconds(entryEl('time').value.trim());
+    const el = document.getElementById('entry-preview');
+    if (seconds === null) { el.textContent = ''; return; }
+    const label = P.eventLabel(entryEl('course').value,
+                               P.normalizeDistance(entryEl('distance').value),
+                               entryEl('stroke').value);
+    el.textContent = `Will save as ${D.secondsToTime(seconds)} \u00b7 ${label}`;
+  }
+
+  async function saveEntry() {
+    clearEntryErrors();
+
+    const name = entryEl('name').value.trim();
+    const timeRaw = entryEl('time').value.trim();
+    const dateRaw = entryEl('date').value.trim();
+
+    if (!name) { showEntryError('Enter the swimmer\u2019s name.', ['name']); entryEl('name').focus(); return; }
+
+    const seconds = D.timeToSeconds(timeRaw);
+    if (seconds === null) {
+      showEntryError('That time is not readable. Use 29.30 for under a minute, or 1:18.14 over a minute.', ['time']);
+      entryEl('time').focus();
+      return;
+    }
+    if (!dateRaw || !D.parseDate(dateRaw)) {
+      showEntryError('Pick the date the race was swum.', ['date']);
+      entryEl('date').focus();
+      return;
+    }
+    // A date in the future is almost always a typo in the year, and it would
+    // quietly land outside the current season and vanish from every view.
+    if (D.parseDate(dateRaw).getTime() > Date.now() + 864e5) {
+      showEntryError('That date is in the future \u2014 check the year.', ['date']);
+      entryEl('date').focus();
+      return;
+    }
+
+    const row = {
+      name,
+      gender: entryEl('gender').value,
+      club: entryEl('club').value.trim(),
+      course: entryEl('course').value,
+      distance: entryEl('distance').value,
+      stroke: entryEl('stroke').value,
+      time: timeRaw,
+      race_date: dateRaw,
+      age_grp: entryEl('age').value.trim(),
+      race_name: entryEl('meet').value.trim()
+    };
+
+    // Reject before touching state, so the row count cannot move on a row the
+    // engine would then silently drop.
+    if (!D.normalizeRow(row, null)) {
+      showEntryError('That race could not be read. Check the distance and stroke.',
+                     ['distance', 'stroke']);
+      return;
+    }
+
+    const before = state.rawRows.length;
+    // Measured here, immediately before the write. A module-level running
+    // count would go stale the moment a CSV was imported between two manual
+    // saves, and a genuine duplicate would then report as saved.
+    const racesBefore = state.dataset ? state.dataset.races.length : 0;
+
+    U.busy(true, 'Saving\u2026');
+    await U.nextFrame();
+    try {
+      state.rawRows = state.rawRows.concat([row]);
+      rebuild({ autoNavigate: false });
+      state.rawRows = datasetToRawRows(state.dataset);
+      await persistRows();
+
+      // dedupe runs inside rebuild, so an identical race typed twice is a
+      // no-op rather than a duplicate. Say so instead of claiming a save.
+      const isDuplicate = state.dataset.races.length === racesBefore;
+
+      refreshEntryNames();
+      if (isDuplicate) {
+        U.toast('That exact race is already recorded');
+      } else {
+        U.toast(`Saved \u00b7 ${name} ${D.secondsToTime(seconds)}`);
+        entryRecent.unshift(`${name} \u00b7 ${D.secondsToTime(seconds)} \u00b7 ` +
+          P.eventLabel(row.course, P.normalizeDistance(row.distance), row.stroke));
+        if (entryRecent.length > 5) entryRecent.pop();
+        renderEntryRecent();
+      }
+
+      // Clear only the time. Name, event, date and meet stay, which is what
+      // makes typing a full heat quick.
+      entryEl('time').value = '';
+      updateEntryPreview();
+      entryEl('time').focus();
+    } catch (err) {
+      state.rawRows = state.rawRows.slice(0, before);
+      showEntryError('The save failed and your data was left unchanged' +
+        (err && err.message ? ': ' + err.message : '.'), []);
+    } finally {
+      U.busy(false);
+    }
+  }
+
+  const entryRecent = [];
+
+  function renderEntryRecent() {
+    document.getElementById('entry-recent').textContent =
+      entryRecent.length ? 'Just added: ' + entryRecent.join('  |  ') : '';
+  }
+
+  /** Existing names offered as an autocomplete list, so typing does not fork
+      one swimmer into two spellings. */
+  function refreshEntryNames() {
+    const list = document.getElementById('entry-names');
+    if (!list || !state.dataset) return;
+    const names = Array.from(state.dataset.swimmers.keys()).sort();
+    U.setHTML(list, names.map(n => `<option value="${U.esc(n)}"></option>`));
   }
 
   function readFile(file) {
@@ -398,6 +578,7 @@
     setTabsEnabled(has);
     updateMeta();
     populateFacets();
+    refreshEntryNames();
 
     // Anything already drawn is now stale. Drop the charts and mark every
     // panel dirty; the active one redraws immediately, the rest when opened.
@@ -587,12 +768,14 @@
         render: r => r.seasonRace
           ? `<span class="time">${U.esc(r.seasonRace.time)}</span>`
           : '<span class="muted">—</span>' },
-      { key: 'formGapPct', label: 'Form', width: 80, align: 'right',
+      // Sorted by seconds, coloured by percentage, printed in seconds.
+      { key: 'formGapSec', label: 'Off PB', width: 86, align: 'right',
+        sortValue: r => r.formGapSec,
         render: r => {
-          if (r.formGapPct === null) return '<span class="muted">—</span>';
-          if (r.formGapPct <= 0.005) return '<span class="badge badge-sb">At PB</span>';
-          const cls = r.formGapPct < 2 ? 'pos-good' : 'pos-bad';
-          return `<span class="${cls} num">+${r.formGapPct.toFixed(1)}%</span>`;
+          if (r.formGapSec === null) return '<span class="muted">—</span>';
+          if (r.formGapSec <= 0.005) return '<span class="badge badge-sb">At PB</span>';
+          const cls = r.formGapPct !== null && r.formGapPct < 2 ? 'pos-good' : 'pos-bad';
+          return `<span class="${cls} num">+${r.formGapSec.toFixed(2)}s</span>`;
         } },
       { key: 'bestPoints', label: 'Points', width: 72, align: 'right',
         render: r => r.bestPoints === null
@@ -645,7 +828,7 @@
       best_event: r.bestRace ? `${r.bestRace.course} ${r.bestRace.distance} ${r.bestRace.stroke}` : '',
       best_time: r.bestRace ? r.bestRace.time : '',
       season_points: r.seasonPoints === null ? '' : r.seasonPoints,
-      form_gap_pct: r.formGapPct === null ? '' : r.formGapPct.toFixed(2),
+      off_pb_seconds: r.formGapSec === null ? '' : r.formGapSec.toFixed(2),
       races: r.raceCount,
       last_raced: r.lastDate ? D.isoDate(r.lastDate) : ''
     }));
@@ -698,7 +881,7 @@
     renderProgressionOnly();
     C.formGap('chart-formgap', sw, { seasonLabel: state.dataset.currentSeason });
     C.eventPortfolio('chart-portfolio', sw);
-    C.consistency('chart-consistency', sw);
+    C.consistency('chart-consistency', sw, { eventKey: document.getElementById('sw-event').value || 'all' });
     renderSwimmerEvents(sw, evs);
   }
 
@@ -706,6 +889,9 @@
     const sw = currentSwimmer();
     if (!sw) return;
     const key = document.getElementById('sw-event').value;
+    // The event selector drives both charts: a seconds axis on the consistency
+    // scatter is only comparable within one event.
+    C.consistency('chart-consistency', sw, { eventKey: key || 'all' });
     if (!key) { C.destroy('chart-progression'); return; }
     C.pbProgression('chart-progression', sw, key);
   }
@@ -748,9 +934,9 @@
         `<td class="num time">${ev.seasonBest ? U.esc(ev.seasonBest.time) : '<span class="muted">—</span>'}</td>` +
         `<td class="num">${gapCell}</td>` +
         `<td class="num">${ev.races.length}</td>` +
-        `<td class="num">${ev.improvementPct === null || ev.improvementPct === 0
+        `<td class="num">${ev.improvementSec === null || ev.improvementSec <= 0.0001
           ? '<span class="muted">—</span>'
-          : `<span class="pos-good">${ev.improvementPct.toFixed(1)}%</span>`}</td>` +
+          : `<span class="pos-good">−${ev.improvementSec.toFixed(2)}s</span>`}</td>` +
         '</tr>';
     });
     U.setHTML(document.getElementById('sw-events-body'), parts);
@@ -1255,6 +1441,8 @@
     start();
   }
 
-  // Exposed for the end-to-end tests only.
-  window.__swimtracker = { state, rebuild, selectPanel };
+  // Exposed for the end-to-end tests only. The engine modules are included so
+  // a test can ask what the data *should* show and compare that against what
+  // the page rendered, rather than restating the derivation in the test.
+  window.__swimtracker = { state, rebuild, selectPanel, data: D, points: P };
 })();
